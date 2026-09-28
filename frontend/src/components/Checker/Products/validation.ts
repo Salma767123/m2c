@@ -131,8 +131,11 @@ function validatePackagingInspection(d: any): StepErrors {
         }
     }
 
+    // Unpacked products have no carton/retail packaging to photograph, so the
+    // packaging-photo requirement is relaxed for them.
+    const unpacked = String(d.packagingType || "").toUpperCase() === "UNPACKED"
     const photos = Array.isArray(d.packagingPhotos) ? d.packagingPhotos : []
-    if (photos.length === 0) e.packagingPhotos = "Upload at least one packaging photo"
+    if (!unpacked && photos.length === 0) e.packagingPhotos = "Upload at least one packaging photo"
 
     return e
 }

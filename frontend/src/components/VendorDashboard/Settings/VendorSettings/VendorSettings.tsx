@@ -1036,8 +1036,17 @@ export default function VendorSettings() {
   const warehouseOwnership = compact([
     mk("Ownership Type", v.ownershipType, { transform: getOwnershipTypeLabel }),
     mk("Warehousing Capacity", formatSqFt(v.warehouseSize || v.storageCapacity)),
-    // Which address QC checkers inspect your products at (location-verified there).
-    mk("Product Inspection Site", String((v as any).productInspectionSite).toUpperCase() === 'WAREHOUSE' ? 'Warehouse address' : 'Legal / Factory address'),
+    // Which address(es) QC checkers inspect your products at (location-verified there).
+    // Multi-select: the vendor may pick FACTORY, WAREHOUSE, or both. Prefer the
+    // array; fall back to the legacy single value for older records.
+    mk("Product Inspection Site", (() => {
+      const sites = Array.isArray((v as any).productInspectionSites) && (v as any).productInspectionSites.length
+        ? (v as any).productInspectionSites
+        : ((v as any).productInspectionSite ? [(v as any).productInspectionSite] : []);
+      return sites.length
+        ? sites.map((s: string) => String(s).toUpperCase() === 'WAREHOUSE' ? 'Warehouse address' : 'Legal / Factory address').join(' & ')
+        : 'Legal / Factory address';
+    })()),
   ]);
   const warehouseAddress = compact([
     mk(

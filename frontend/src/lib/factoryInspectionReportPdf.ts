@@ -339,6 +339,8 @@ export function generateFactoryInspectionPdf(
 
   // ── A. Company Information ──────────────────────────────────────────────────
   sectionTitle("A. Company Information", sectionStatus(['c_']))
+  // Logo first — at the top of its section, before the details table.
+  renderThumbnail(options.companyLogoDataUrl, "Company Logo")
   const gstDisplay = v.gstNumber
     ? val(v.gstNumber)
     : v.gstNumber === null || v.businessType === "unregistered"
@@ -355,7 +357,6 @@ export function generateFactoryInspectionPdf(
   if (!blank(v.iecCode)) companyRows.push(["IEC Code", val(v.iecCode)])
   if (!blank(v.website)) companyRows.push(["Website", val(v.website)])
   runTable([["Field", "Value"]], companyRows)
-  renderThumbnail(options.companyLogoDataUrl, "Company Logo")
 
   // Business Contact Details (shown immediately after Company Information)
   const bizPhone2 = v.phoneNumber2
@@ -432,6 +433,8 @@ export function generateFactoryInspectionPdf(
   sectionTitle("C. Owner Profile", sectionStatus(['o_']))
 
   subTitle("Owner Identity")
+  // Owner photo first — at the top of the section, before the details table.
+  renderThumbnail(options.ownerPhotoDataUrl, "Owner Profile Photo")
   const ownerFullName = buildName(v.ownerTitle, v.ownerFirstName, v.ownerMiddleName, v.ownerLastName) || v.ownerName
   const ownerLandline = localLandline("+91", v.ownerLocalLandlineStd, v.ownerLandline)
   const ownerIntlLine = hasIntlLandline(v.ownerIntlLandline) ? val(v.ownerIntlLandline) : null
@@ -448,7 +451,6 @@ export function generateFactoryInspectionPdf(
   ownerRows.push(["Business Start Date", fmtDate(v.businessStartDate)])
   ownerRows.push(["Number of Employees", val(EMPLOYEE_COUNT[v.employeeCount] || v.employeeCount)])
   runTable([["Field", "Value"]], ownerRows)
-  renderThumbnail(options.ownerPhotoDataUrl, "Owner Profile Photo")
 
   if (v.ownerAddress || v.ownerCity || v.ownerState) {
     subTitle("Owner Address")
@@ -563,6 +565,8 @@ export function generateFactoryInspectionPdf(
   const mainContact = v.mainContact || null
   if (mainContact) {
     subTitle("Main Contact Person")
+    // Contact photo first — at the top of the subsection, before the details table.
+    renderThumbnail(options.mainContactPhotoDataUrl, "Main Contact Photo")
     const mcName = buildName(mainContact.title, mainContact.firstName, mainContact.middleName, mainContact.lastName)
     const mcRows: string[][] = [["Contact Name", val(mcName)]]
     if (!blank(mainContact.designation)) {
@@ -580,7 +584,6 @@ export function generateFactoryInspectionPdf(
     if (!blank(mainContact.phone1)) mcRows.push(["Primary Phone", val(mainContact.phone1)])
     if (!blank(mainContact.phone2)) mcRows.push(["Secondary Phone", val(mainContact.phone2)])
     runTable([["Field", "Value"]], mcRows)
-    renderThumbnail(options.mainContactPhotoDataUrl, "Main Contact Photo")
   }
 
   // Contact Person 2 (alternate contacts)
@@ -814,7 +817,7 @@ export function generateFactoryInspectionPdf(
     doc.text(`Digitally signed  ·  ${fmtDateTime(generatedAt)}`, sigX, y + 70)
   } else {
     // Manual: blank line only — client will sign and stamp physically
-    doc.text("Client Signature & Seal:", sigX, y)
+    doc.text("Client Seal & Signature:", sigX, y)
     doc.setDrawColor(...MUTED)
     doc.line(sigX, y + 55, sigX + 185, y + 55)
   }

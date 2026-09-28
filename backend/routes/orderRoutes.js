@@ -147,6 +147,8 @@ router.get('/:id', orderController.getOrderById);
 // Customer self-service: cancel a pre-dispatch order, or request a return after delivery.
 router.post('/:id/cancel', orderController.cancelMyOrder);
 router.post('/:id/return', orderController.requestReturn);
+// Customer "Buy Again": re-add a past order's items to the cart.
+router.post('/:id/reorder', orderController.reorderToCart);
 
 // Customer: Download their own invoice
 router.get('/:id/invoice', async (req, res) => {

@@ -89,8 +89,7 @@ const createInspection = async (req, res) => {
         });
 
         // Notify the QC checker — in-app feed + FCM push
-        const vendorRecord = await prisma.vendor.findUnique({ where: { id: vendorId }, select: { companyName: true } });
-        const vendorName = vendorRecord?.companyName || 'Vendor';
+        const vendorName = vendor?.companyName || 'Vendor';
         const { createNotification: createInspNotif } = require('./notificationController');
         createInspNotif({
             userId: checkerId, role: 'QC_CHECKER', type: 'INSPECTION_SCHEDULED',
@@ -98,6 +97,24 @@ const createInspection = async (req, res) => {
             message: `Inspection for "${vendorName}" scheduled on ${scheduledDate}.`,
             data: { screen: 'vendors', vendorId }
         }).catch(() => {});
+
+        // Notify the vendor by email immediately that a factory inspection is assigned.
+        // Fire-and-forget — a mail failure must never fail the assignment itself.
+        try {
+            const { sendFactoryInspectionAssignedEmail } = require('../utils/email/vendorEmailSender');
+            sendFactoryInspectionAssignedEmail({
+                to: vendor?.email || vendor?.businessEmail || vendor?.ownerEmail,
+                companyName: vendor?.companyName,
+                ownerName: vendor?.ownerName,
+                checkerName: checker?.name,
+                scheduledDate,
+                scheduledTime,
+                priority,
+                estimatedDuration: estimatedDuration || '1 Hour',
+            }).catch((e) => console.error('Factory-inspection vendor email failed:', e?.message || e));
+        } catch (e) {
+            console.error('Factory-inspection vendor email dispatch error:', e?.message || e);
+        }
 
         res.status(201).json({ success: true, message: 'Inspection assigned successfully', inspection: newInspection });
     } catch (error) {
@@ -481,6 +498,33 @@ const updateInspection = async (req, res) => {
                     data: { screen: 'vendors', vendorId: updatedInspection.vendorId },
                 }).catch(() => {});
             } catch (e) { console.error('Reassign notify failed:', e); }
+        }
+
+        // Email the vendor with the updated factory inspection schedule (reassignment).
+        // Fire-and-forget — a mail failure must never fail the update itself.
+        try {
+            const [vendorRec, checkerRec] = await Promise.all([
+                prisma.vendor.findUnique({
+                    where: { id: updatedInspection.vendorId },
+                    select: { companyName: true, ownerName: true, email: true, businessEmail: true, ownerEmail: true },
+                }),
+                updatedInspection.checkerId
+                    ? prisma.qCChecker.findUnique({ where: { id: updatedInspection.checkerId }, select: { name: true } })
+                    : null,
+            ]);
+            const { sendFactoryInspectionAssignedEmail } = require('../utils/email/vendorEmailSender');
+            sendFactoryInspectionAssignedEmail({
+                to: vendorRec?.email || vendorRec?.businessEmail || vendorRec?.ownerEmail,
+                companyName: vendorRec?.companyName,
+                ownerName: vendorRec?.ownerName,
+                checkerName: checkerRec?.name,
+                scheduledDate: updatedInspection.scheduledDate,
+                scheduledTime: updatedInspection.scheduledTime,
+                priority: updatedInspection.priority,
+                estimatedDuration: updatedInspection.estimatedDuration,
+            }).catch((e) => console.error('Factory-inspection reassign vendor email failed:', e?.message || e));
+        } catch (e) {
+            console.error('Factory-inspection reassign vendor email dispatch error:', e?.message || e);
         }
 
         res.json({ success: true, message: 'Inspection updated successfully', inspection: updatedInspection });

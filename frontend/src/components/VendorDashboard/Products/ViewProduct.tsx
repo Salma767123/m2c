@@ -305,7 +305,7 @@ export default function ViewProduct({ productId }: ViewProductProps) {
                 {fs.composition && <InfoField label="Composition" value={fs.composition} />}
                 {fs.weightValue && <InfoField icon={<Scale className="h-3.5 w-3.5" />} label="Weight" value={`${fs.weightValue} g`} />}
                 {fs.length && <InfoField icon={<Ruler className="h-3.5 w-3.5" />} label="Length" value={`${fs.length} cm`} />}
-                {fs.breadth && <InfoField icon={<Ruler className="h-3.5 w-3.5" />} label="Breadth" value={`${fs.breadth} cm`} />}
+                {fs.breadth && <InfoField icon={<Ruler className="h-3.5 w-3.5" />} label="Width" value={`${fs.breadth} cm`} />}
                 {fs.gsm && <InfoField icon={<Scale className="h-3.5 w-3.5" />} label="GSM" value={`${fs.gsm} GSM`} />}
                 {/* Legacy single-weight field for products created before the GSM fields existed. */}
                 {!fs.gsm && !fs.weightValue && fs.weight && <InfoField icon={<Scale className="h-3.5 w-3.5" />} label="Weight" value={`${fs.weight}${fs.weightUnit ? ` ${fs.weightUnit}` : ''}`} />}

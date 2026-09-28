@@ -16,6 +16,22 @@ const {
 } = require('../utils/email/vendorEmailSender');
 const { getValidVerifiedOtp, consumeOtp } = require('./enquiryController');
 
+// Normalize the product-handling site selection into a validated array of
+// 'FACTORY' | 'WAREHOUSE'. Accepts the multi-select array (`sites`) or the legacy
+// single value (`single`); JSON-encoded strings (FormData) are parsed. Falls back
+// to ['FACTORY'] so a QC product inspection always has a site to geofence against.
+function normalizeInspectionSites(sites, single) {
+  let arr = sites;
+  if (typeof arr === 'string') {
+    try { arr = JSON.parse(arr); } catch { arr = arr.split(','); }
+  }
+  if (!Array.isArray(arr)) arr = single != null && single !== '' ? [single] : [];
+  const cleaned = [...new Set(
+    arr.map((s) => (String(s).toUpperCase() === 'WAREHOUSE' ? 'WAREHOUSE' : 'FACTORY')),
+  )];
+  return cleaned.length > 0 ? cleaned : ['FACTORY'];
+}
+
 // FormData serializes undefined/null as "" (empty string), which JSON.parse
 // rejects with "Unexpected end of JSON input". This helper accepts whatever
 // shape the field arrives in (already-parsed object, JSON-encoded string,
@@ -265,8 +281,11 @@ const registerVendor = async (req, res) => {
       longitude,
       warehouseLatitude,
       warehouseLongitude,
-      // Where products are handled → the site a QC product inspection geofences against.
+      // Where products are handled → the site(s) a QC product inspection geofences
+      // against. `productInspectionSites` is the multi-select array; the legacy single
+      // `productInspectionSite` is still accepted for older clients.
       productInspectionSite,
+      productInspectionSites,
 
       // Vendor Type & Products
       vendorType,
@@ -804,9 +823,12 @@ const registerVendor = async (req, res) => {
         latField: 'warehouseLatitude',
         lngField: 'warehouseLongitude',
       }),
-      // Product-handling site for QC product-inspection geofencing. Only WAREHOUSE or
-      // FACTORY are valid; anything else (incl. blank) falls back to FACTORY.
-      productInspectionSite: String(productInspectionSite).toUpperCase() === 'WAREHOUSE' ? 'WAREHOUSE' : 'FACTORY',
+      // Product-handling site(s) for QC product-inspection geofencing. The vendor may
+      // pick FACTORY, WAREHOUSE, or both; the legacy single field mirrors the first.
+      ...(() => {
+        const arr = normalizeInspectionSites(productInspectionSites, productInspectionSite);
+        return { productInspectionSites: arr, productInspectionSite: arr[0] };
+      })(),
 
       // Vendor Type & Products
       vendorType: getVendorTypeEnum(parsedVendorType),
@@ -1884,8 +1906,11 @@ const updateVendorById = async (req, res) => {
       }),
       // Product-handling site (QC product-inspection geofence). Only update when the
       // admin form sent a value; normalise to WAREHOUSE/FACTORY.
-      ...(updateData.productInspectionSite !== undefined
-        ? { productInspectionSite: String(updateData.productInspectionSite).toUpperCase() === 'WAREHOUSE' ? 'WAREHOUSE' : 'FACTORY' }
+      ...((updateData.productInspectionSites !== undefined || updateData.productInspectionSite !== undefined)
+        ? (() => {
+            const arr = normalizeInspectionSites(updateData.productInspectionSites, updateData.productInspectionSite);
+            return { productInspectionSites: arr, productInspectionSite: arr[0] };
+          })()
         : {}),
 
       // Vendor Type & Products
@@ -3197,6 +3222,7 @@ const upsertVendorBankDetailsByAdmin = async (req, res) => {
       ifscCode,
       accountType,
       accountHolderName,
+      legalEntity,
       branchName,
       branchAddress,
     } = req.body;
@@ -3226,29 +3252,65 @@ const upsertVendorBankDetailsByAdmin = async (req, res) => {
       ifscCode: String(ifscCode).toUpperCase(),
       accountType,
       accountHolderName,
+      // Admins may edit the legal entity; default to the vendor's company name.
+      legalEntity: (legalEntity && String(legalEntity).trim()) || vendor.companyName || null,
       branchName: branchName || null,
       branchAddress: branchAddress || null,
     };
 
-    // Details changed → the previous verification no longer applies.
+    // Any change to an account-defining field → the previous verification no
+    // longer applies. Even after a full approval, editing these restarts the
+    // whole penny-drop handshake from PENDING; only after the vendor re-confirms
+    // can the admin approve again.
     const accountChanged = existing && (
       existing.accountNumber !== data.accountNumber ||
       existing.ifscCode !== data.ifscCode ||
-      existing.accountHolderName !== data.accountHolderName
+      existing.accountHolderName !== data.accountHolderName ||
+      existing.bankName !== data.bankName ||
+      (existing.accountType || '') !== (data.accountType || '')
     );
+    const wasVerified = !!(existing && existing.isVerified);
+    const resetVerification = accountChanged
+      ? {
+          isVerified: false,
+          verifiedAt: null,
+          verifiedBy: null,
+          verificationStatus: 'PENDING',
+          amountSentAt: null,
+          vendorRespondedAt: null,
+          verificationNote: null,
+          vendorNote: null,
+        }
+      : {};
 
     const bankDetails = await prisma.vendorBankDetails.upsert({
       where: { vendorId },
       create: { vendorId, ...data },
       update: {
         ...data,
-        ...(accountChanged ? { isVerified: false, verifiedAt: null, verifiedBy: null } : {}),
+        ...resetVerification,
       },
     });
 
+    // If previously-verified details were changed, let the vendor know their
+    // account must be re-verified (the handshake has restarted).
+    if (accountChanged && wasVerified) {
+      const { createNotification } = require('./notificationController');
+      createNotification({
+        userId: vendorId,
+        role: 'VENDOR',
+        type: 'BANK_REVERIFICATION_REQUIRED',
+        title: 'Bank details updated — re-verification needed',
+        message: 'Your bank details were updated. They now need to be re-verified: the admin will send a small verification amount again for you to confirm.',
+        data: { bankDetailsId: bankDetails.id },
+      }).catch(() => {});
+    }
+
     res.json({
       success: true,
-      message: 'Bank details saved successfully',
+      message: accountChanged && wasVerified
+        ? 'Bank details updated — verification has been reset and must be repeated.'
+        : 'Bank details saved successfully',
       bankDetails,
     });
   } catch (error) {
@@ -3274,14 +3336,34 @@ const verifyVendorBankDetails = async (req, res) => {
       return res.status(400).json({ error: 'Bank details are already verified' });
     }
 
+    // Final approval only after the vendor has confirmed they received the test
+    // amount (the penny-drop handshake).
+    if (bankDetails.verificationStatus !== 'RECEIVED') {
+      return res.status(400).json({
+        error: 'The vendor must confirm they received the verification amount before you can approve.',
+      });
+    }
+
     const updatedBankDetails = await prisma.vendorBankDetails.update({
       where: { vendorId },
       data: {
         isVerified: true,
         verifiedAt: new Date(),
-        verifiedBy: req.user?.id || req.admin?.id // Using user/admin id if available in token
+        verifiedBy: req.user?.id || req.admin?.id, // Using user/admin id if available in token
+        verificationStatus: 'VERIFIED',
       }
     });
+
+    // Tell the vendor their bank details are approved.
+    const { createNotification } = require('./notificationController');
+    createNotification({
+      userId: vendorId,
+      role: 'VENDOR',
+      type: 'BANK_VERIFIED',
+      title: 'Bank details verified',
+      message: 'Your bank account has been verified and approved for payouts.',
+      data: { bankDetailsId: bankDetails.id },
+    }).catch(() => {});
 
     res.json({
       message: 'Vendor bank details verified successfully',
@@ -3291,6 +3373,52 @@ const verifyVendorBankDetails = async (req, res) => {
   } catch (error) {
     console.error('Verify vendor bank details error:', error);
     res.status(500).json({ error: 'Internal server error while verifying bank details' });
+  }
+};
+
+// PUT /api/vendors/:vendorId/bank-verification/send — admin marks that a test
+// (penny-drop) amount was sent to the vendor's account; vendor is asked to confirm.
+const sendBankVerificationAmount = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+    const { note } = req.body || {};
+
+    const bankDetails = await prisma.vendorBankDetails.findUnique({ where: { vendorId } });
+    if (!bankDetails) {
+      return res.status(404).json({ error: 'Bank details not found for this vendor' });
+    }
+    if (bankDetails.isVerified) {
+      return res.status(400).json({ error: 'Bank details are already verified' });
+    }
+    if (!['PENDING', 'NOT_RECEIVED', 'AMOUNT_SENT'].includes(bankDetails.verificationStatus || 'PENDING')) {
+      return res.status(400).json({ error: 'Cannot send a verification amount in the current state.' });
+    }
+
+    const updated = await prisma.vendorBankDetails.update({
+      where: { vendorId },
+      data: {
+        verificationStatus: 'AMOUNT_SENT',
+        amountSentAt: new Date(),
+        vendorRespondedAt: null,
+        verificationNote: note ? String(note).trim().slice(0, 300) : null,
+      },
+    });
+
+    // Ask the vendor to confirm receipt.
+    const { createNotification } = require('./notificationController');
+    createNotification({
+      userId: vendorId,
+      role: 'VENDOR',
+      type: 'BANK_VERIFICATION_AMOUNT_SENT',
+      title: 'Verification amount sent',
+      message: `We've sent a small verification amount to your bank account${updated.verificationNote ? ` (${updated.verificationNote})` : ''}. Please confirm whether you received it in Settings → Bank Details.`,
+      data: { bankDetailsId: bankDetails.id },
+    }).catch(() => {});
+
+    res.json({ message: 'Verification amount marked as sent', bankDetails: updated });
+  } catch (error) {
+    console.error('Send bank verification amount error:', error);
+    res.status(500).json({ error: 'Internal server error while sending verification amount' });
   }
 };
 
@@ -3313,5 +3441,6 @@ module.exports = {
   testVendorEmail,
   assignQc,
   verifyVendorBankDetails,
+  sendBankVerificationAmount,
   upsertVendorBankDetailsByAdmin
 };

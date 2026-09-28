@@ -172,6 +172,41 @@ const LAYOUTS = {
     rawAfterTable: `          <p style="margin:0 0 6px;color:#6b7280;font-size:13px;">Estimated Duration</p>\n          {{estimatedDurationAndLocationBlock}}`,
   },
 
+  factory_inspection_assigned: {
+    defaults: {
+      emoji: '🏭', headerTitle: 'Factory Inspection Assigned',
+      headerSubtitle: 'A QC inspection has been scheduled for your facility',
+      bodyText: 'Dear {{ownerName}},\n\nA factory inspection has been assigned for {{companyName}}. Our QC team will get in touch with you and visit your facility on the scheduled date and time below. Please ensure your facility and an authorized representative are available.',
+      buttonLabel: '', footerText: 'This is an automated notification. Please do not reply to this email.',
+    },
+    infoRows: [
+      ['QC Checker', 'checkerName', false],
+      ['Scheduled Date', 'scheduledDate', false],
+      ['Scheduled Time', 'scheduledTime', false],
+      ['Priority', 'priorityDisplay', false],
+      ['Estimated Duration', 'estimatedDuration', false],
+    ],
+    note: 'Our team will contact you and arrive on the scheduled date. If you need to reschedule, please contact our support team as early as possible.',
+  },
+
+  product_inspection_assigned: {
+    defaults: {
+      emoji: '📦', headerTitle: 'Product Inspection Assigned',
+      headerSubtitle: 'A QC inspection has been scheduled for your product',
+      bodyText: 'Dear {{ownerName}},\n\nA product inspection has been assigned for your product "{{productName}}". Our QC team will get in touch with you and carry out the inspection on the scheduled date and time below. Please keep the product and any required documentation ready.',
+      buttonLabel: '', footerText: 'This is an automated notification. Please do not reply to this email.',
+    },
+    infoRows: [
+      ['Product', 'productName', false],
+      ['QC Checker', 'checkerName', false],
+      ['Scheduled Date', 'scheduledDate', false],
+      ['Scheduled Time', 'scheduledTime', false],
+      ['Priority', 'priorityDisplay', false],
+      ['Estimated Duration', 'estimatedDuration', false],
+    ],
+    note: 'Our team will contact you and arrive on the scheduled date. If you need to reschedule, please contact our support team as early as possible.',
+  },
+
   vendor_approval_credentials: {
     defaults: {
       emoji: '🎉', headerTitle: 'Your Vendor Account is Approved',

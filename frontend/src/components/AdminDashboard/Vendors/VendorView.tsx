@@ -7,6 +7,8 @@ import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Badge } from '@/components/UI/Badge'
 import { LoadingSpinner } from '@/components/UI/LoadingSpinner'
+import { openDoc } from '@/lib/docViewerBus'
+import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import {
   ArrowLeft,
   Plus,
@@ -38,6 +40,12 @@ import {
   AlertCircle,
   RotateCcw,
   Megaphone,
+  Hash,
+  Landmark,
+  Wallet,
+  BadgeCheck,
+  Send,
+  ShieldCheck,
 } from 'lucide-react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import Dropdown from '@/components/UI/Dropdown'
@@ -832,7 +840,9 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                   <img
                     src={(vendor as any).ownerPhoto}
                     alt={vendor.ownerName}
-                    className="w-20 h-20 rounded-full object-cover border-2 border-slate-200"
+                    onClick={() => openDoc((vendor as any).ownerPhoto, vendor.ownerName || 'Owner', true)}
+                    title="View full photo"
+                    className="w-20 h-20 rounded-full object-cover border-2 border-slate-200 cursor-zoom-in transition hover:ring-2 hover:ring-[#e01a1b]/40"
                   />
                 </div>
               )}
@@ -925,7 +935,9 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                           <img
                             src={owner.photo}
                             alt={`Owner ${index + 2} profile`}
-                            className="w-12 h-12 rounded-full object-cover border border-slate-200 shrink-0 mt-0.5"
+                            onClick={() => openDoc(owner.photo, owner.name || `Owner ${index + 2}`, true)}
+                            title="View full photo"
+                            className="w-12 h-12 rounded-full object-cover border border-slate-200 shrink-0 mt-0.5 cursor-zoom-in transition hover:ring-2 hover:ring-[#e01a1b]/40"
                           />
                         ) : (
                           <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 mt-0.5">
@@ -1381,7 +1393,14 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
               <div className="mt-3">
                 <p className="text-sm text-slate-500">Product Inspection Site</p>
                 <p className="font-medium">
-                  {String(v.productInspectionSite).toUpperCase() === 'WAREHOUSE' ? 'Warehouse address' : 'Legal / Factory address'}
+                  {(() => {
+                    const sites = Array.isArray((v as any).productInspectionSites) && (v as any).productInspectionSites.length
+                      ? (v as any).productInspectionSites
+                      : (v.productInspectionSite ? [v.productInspectionSite] : []);
+                    return sites.length
+                      ? sites.map((s: string) => String(s).toUpperCase() === 'WAREHOUSE' ? 'Warehouse address' : 'Legal / Factory address').join(' & ')
+                      : 'Legal / Factory address';
+                  })()}
                 </p>
                 <p className="text-xs text-slate-400 mt-0.5">Products are location-verified at this address during QC inspection.</p>
               </div>
@@ -1876,14 +1895,21 @@ const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/
 function BankDetailsFormModal({
   vendorId,
   existing,
+  businessType,
+  companyName,
   onClose,
   onSaved,
 }: {
   vendorId: string
   existing?: any
+  businessType?: string
+  companyName?: string
   onClose: () => void
   onSaved: (saved: any) => void
 }) {
+  // Registered vendors (any businessType other than "unregistered") are locked
+  // to a Current Account; only unregistered vendors may choose Savings or Current.
+  const isUnregistered = String(businessType || '').toLowerCase() === 'unregistered'
   const [form, setForm] = useState({
     accountHolderName: existing?.accountHolderName || '',
     bankName: existing?.bankName || '',
@@ -1891,7 +1917,10 @@ function BankDetailsFormModal({
     // A legacy row may hold the IFSC in the SWIFT column — surface it here so
     // the admin can save it back into the correct field.
     ifscCode: existing?.ifscCode || (IFSC_REGEX.test(String(existing?.swiftCode || '')) ? existing.swiftCode : '') || '',
-    accountType: (existing?.accountType || 'savings').toLowerCase(),
+    // Registered vendor with no saved type defaults to Current.
+    accountType: (existing?.accountType || (isUnregistered ? 'savings' : 'current')).toLowerCase(),
+    // Editable for admins; defaults to the vendor's registered company name.
+    legalEntity: existing?.legalEntity || companyName || '',
     branchName: existing?.branchName || '',
     branchAddress: existing?.branchAddress || '',
   })
@@ -1923,6 +1952,8 @@ function BankDetailsFormModal({
     try {
       const res = await VendorService.upsertVendorBankDetailsByAdmin(vendorId, {
         ...form,
+        // Registered vendors are locked to a Current Account.
+        accountType: isUnregistered ? form.accountType : 'current',
         ifscCode: form.ifscCode.toUpperCase(),
       })
       onSaved(res.bankDetails)
@@ -1977,6 +2008,11 @@ function BankDetailsFormModal({
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Legal Entity — editable for admins; defaults to the company name. */}
+            <div className="md:col-span-2">
+              {field('legalEntity', 'Legal Entity', { placeholder: 'Registered company / legal entity name' })}
+              <p className="-mt-0.5 text-xs text-slate-400">Defaults to the vendor&apos;s registered company name.</p>
+            </div>
             {field('accountHolderName', 'Account Holder Name', { required: true, placeholder: 'As printed on the passbook' })}
             {field('bankName', 'Bank Name', { required: true, placeholder: 'e.g. ICICI Bank' })}
             {field('accountNumber', 'Account Number', { required: true, mono: true })}
@@ -1986,14 +2022,23 @@ function BankDetailsFormModal({
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Account Type <span className="text-brand-500">*</span>
               </label>
-              <select
+              <Dropdown
                 value={form.accountType}
-                onChange={e => set('accountType', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
-              >
-                <option value="savings">Savings</option>
-                <option value="current">Current</option>
-              </select>
+                onChange={(v) => set('accountType', String(v))}
+                placeholder="Select account type"
+                options={
+                  isUnregistered
+                    ? [
+                        { value: 'savings', label: 'Savings Account' },
+                        { value: 'current', label: 'Current Account' },
+                      ]
+                    : [{ value: 'current', label: 'Current Account' }]
+                }
+              />
+              {!isUnregistered && (
+                <p className="mt-1 text-xs text-slate-400">Registered vendors must use a Current Account.</p>
+              )}
+              {errors.accountType && <p className="text-xs text-red-600 mt-1">{errors.accountType}</p>}
             </div>
 
             {field('branchName', 'Branch Name', { placeholder: 'e.g. Anna Nagar' })}
@@ -2030,10 +2075,32 @@ function BankDetailsTab({ vendor, onVerify, loading, onBankSaved }: { vendor: Ve
   const [showForm, setShowForm] = useState(false)
   const canEdit = hasPermission('vendor_management:edit')
 
+  // Penny-drop verification handshake state.
+  const [sendModalOpen, setSendModalOpen] = useState(false)
+  const [sendNote, setSendNote] = useState('')
+  const [sendBusy, setSendBusy] = useState(false)
+
+  const doSendAmount = async () => {
+    try {
+      setSendBusy(true)
+      const res = await VendorService.sendBankVerificationAmount(vendor.id, sendNote.trim() || undefined)
+      onBankSaved?.(res.bankDetails)
+      showSuccessToast('Verification amount marked as sent', 'The vendor has been asked to confirm receipt.')
+      setSendModalOpen(false)
+      setSendNote('')
+    } catch (e: any) {
+      showErrorToast('Failed', e?.response?.data?.error || e?.message || 'Could not update.')
+    } finally {
+      setSendBusy(false)
+    }
+  }
+
   const formModal = showForm ? (
     <BankDetailsFormModal
       vendorId={vendor.id}
       existing={bankDetails}
+      businessType={(vendor as any).businessType}
+      companyName={vendor.companyName}
       onClose={() => setShowForm(false)}
       onSaved={saved => onBankSaved?.(saved)}
     />
@@ -2074,8 +2141,10 @@ function BankDetailsTab({ vendor, onVerify, loading, onBankSaved }: { vendor: Ve
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <span className="flex items-center space-x-2">
-            <CreditCard className="h-5 w-5" />
+          <span className="flex items-center gap-2.5">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-brand-500/10 text-brand-600">
+              <CreditCard className="h-5 w-5" />
+            </span>
             <span>Bank Information</span>
           </span>
           {canEdit && (
@@ -2094,15 +2163,22 @@ function BankDetailsTab({ vendor, onVerify, loading, onBankSaved }: { vendor: Ve
           couldn't tell "not provided" from "not displayed".
         */}
         {(() => {
-          const Field = ({ label, value, mono = false, hint }: { label: string; value?: string | null; mono?: boolean; hint?: string }) => (
-            <div>
-              <p className="text-sm text-slate-500">{label}</p>
-              {value ? (
-                <p className={`font-medium ${mono ? 'font-mono' : ''} break-words`}>{value}</p>
-              ) : (
-                <p className="font-medium text-slate-400 italic">Not provided</p>
-              )}
-              {hint && value && <p className="text-xs text-amber-600 mt-0.5">{hint}</p>}
+          // Styled field cell — icon chip + uppercase label + value, matching the
+          // app's card UI. Falls back to a muted "Not provided" when empty.
+          const Field = ({ icon: Icon, label, value, mono = false, hint }: { icon: any; label: string; value?: string | null; mono?: boolean; hint?: string }) => (
+            <div className="flex items-start gap-3 rounded-xl border border-slate-200/70 bg-slate-50/50 p-3.5 transition-colors hover:bg-slate-50">
+              <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-slate-500 ring-1 ring-slate-200">
+                <Icon className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+                {value ? (
+                  <p className={`mt-0.5 text-sm font-semibold text-slate-800 break-words ${mono ? 'font-mono tracking-tight' : ''}`}>{value}</p>
+                ) : (
+                  <p className="mt-0.5 text-sm font-medium italic text-slate-400">Not provided</p>
+                )}
+                {hint && value && <p className="mt-1 text-[11px] text-amber-600">{hint}</p>}
+              </div>
             </div>
           );
 
@@ -2117,62 +2193,135 @@ function BankDetailsTab({ vendor, onVerify, loading, onBankSaved }: { vendor: Ve
           const looksLikeIfsc = (v?: string | null) => !!v && /^[A-Z]{4}0[A-Z0-9]{6}$/i.test(v.trim());
           const swiftIsActuallyIfsc = looksLikeIfsc(bankDetails.swiftCode) && !bankDetails.ifscCode;
 
+          const SectionLabel = ({ children }: { children: React.ReactNode }) => (
+            <p className="mb-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">{children}</p>
+          );
+
           return (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <Field label="Account Holder Name" value={bankDetails.accountHolderName} />
-                <Field label="Bank Name" value={bankDetails.bankName} />
-                <Field label="Account Number" value={bankDetails.accountNumber} mono />
-                <Field label="Account Type" value={bankDetails.accountType} />
+            <div className="space-y-6">
+              {/* Account */}
+              <div>
+                <SectionLabel>Account</SectionLabel>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <Field icon={Building2} label="Legal Entity" value={(bankDetails as any).legalEntity} />
+                  <Field icon={User} label="Account Holder Name" value={bankDetails.accountHolderName} />
+                  <Field icon={Landmark} label="Bank Name" value={bankDetails.bankName} />
+                  <Field icon={Hash} label="Account Number" value={bankDetails.accountNumber} mono />
+                  <Field icon={Wallet} label="Account Type" value={bankDetails.accountType} />
+                  <Field
+                    icon={BadgeCheck}
+                    label="IFSC Code"
+                    value={bankDetails.ifscCode || (swiftIsActuallyIfsc ? bankDetails.swiftCode : null)}
+                    mono
+                    hint={swiftIsActuallyIfsc ? 'Recorded in the SWIFT field on an older form — verify before payout.' : undefined}
+                  />
+                </div>
               </div>
 
-              <div className="space-y-4">
-                <Field
-                  label="IFSC Code"
-                  value={bankDetails.ifscCode || (swiftIsActuallyIfsc ? bankDetails.swiftCode : null)}
-                  mono
-                  hint={swiftIsActuallyIfsc ? 'Recorded in the SWIFT field on an older form — verify before payout.' : undefined}
-                />
-                <Field label="Branch Name" value={bankDetails.branchName} />
-                <Field label="Branch Address" value={bankDetails.branchAddress} />
+              {/* Branch */}
+              <div>
+                <SectionLabel>Branch</SectionLabel>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <Field icon={MapPin} label="Branch Name" value={bankDetails.branchName} />
+                  <Field icon={MapPin} label="Branch Address" value={bankDetails.branchAddress} />
+                </div>
               </div>
             </div>
           );
         })()}
 
         {bankDetails.isVerified !== undefined && (
-          <div className="mt-6 pt-6 border-t border-slate-100 flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-slate-500">Verification Status:</span>
-              {bankDetails.isVerified ? (
-                <Badge className="bg-green-50 text-green-700 border border-green-200 flex items-center gap-1">
-                  <CheckCircle className="h-3 w-3" /> Verified
-                </Badge>
-              ) : (
-                <div className="flex items-center gap-4">
-                  <Badge className="bg-yellow-50 text-yellow-700 border border-yellow-200">Pending Verification</Badge>
-                  {onVerify && hasPermission('vendor_management:edit') && (
-                    <Button
-                      size="sm"
-                      onClick={onVerify}
-                      disabled={loading}
-                      className="bg-brand-500 hover:bg-brand-600 text-white"
-                    >
-                      {loading ? <LoadingSpinner size="sm" /> : 'Verify Bank Details'}
-                    </Button>
-                  )}
+          <div className="mt-6">
+            {(() => {
+              const status: string = bankDetails.isVerified ? 'VERIFIED' : (bankDetails.verificationStatus || 'PENDING')
+              const canManage = hasPermission('vendor_management:edit')
+              // Per-status banner theme + icon.
+              const theme = {
+                VERIFIED:     { box: 'border-green-200 bg-green-50/60',    chip: 'bg-green-100 text-green-700',     Icon: BadgeCheck,   badge: 'bg-green-100 text-green-700 border border-green-200',     label: 'Verified' },
+                AMOUNT_SENT:  { box: 'border-blue-200 bg-blue-50/60',      chip: 'bg-blue-100 text-blue-700',       Icon: Send,         badge: 'bg-blue-100 text-blue-700 border border-blue-200',       label: 'Amount sent — awaiting vendor' },
+                RECEIVED:     { box: 'border-emerald-200 bg-emerald-50/60',chip: 'bg-emerald-100 text-emerald-700', Icon: CheckCircle,  badge: 'bg-emerald-100 text-emerald-700 border border-emerald-200', label: 'Vendor confirmed receipt' },
+                NOT_RECEIVED: { box: 'border-red-200 bg-red-50/60',        chip: 'bg-red-100 text-red-700',         Icon: AlertTriangle, badge: 'bg-red-100 text-red-700 border border-red-200',           label: 'Vendor did not receive' },
+                PENDING:      { box: 'border-amber-200 bg-amber-50/60',    chip: 'bg-amber-100 text-amber-700',     Icon: ShieldCheck,  badge: 'bg-amber-100 text-amber-700 border border-amber-200',     label: 'Pending — send verification amount' },
+              }[status] || { box: 'border-amber-200 bg-amber-50/60', chip: 'bg-amber-100 text-amber-700', Icon: ShieldCheck, badge: 'bg-amber-100 text-amber-700 border border-amber-200', label: 'Pending' }
+              const BannerIcon = theme.Icon
+              return (
+                <div className={`rounded-xl border p-4 ${theme.box}`}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${theme.chip}`}>
+                        <BannerIcon className="h-5 w-5" />
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Verification Status</span>
+                          <Badge className={theme.badge}>{theme.label}</Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-slate-600 max-w-xl">
+                          {status === 'PENDING' && 'Send a small test amount to the vendor’s account, then ask them to confirm receipt before approving.'}
+                          {status === 'AMOUNT_SENT' && `Waiting for the vendor to confirm they received the amount${bankDetails.amountSentAt ? ` (sent ${new Date(bankDetails.amountSentAt).toLocaleString()})` : ''}.`}
+                          {status === 'RECEIVED' && 'The vendor confirmed receipt. You can now approve the bank details.'}
+                          {status === 'NOT_RECEIVED' && 'The vendor reported they did not receive the amount. Recheck and resend.'}
+                          {status === 'VERIFIED' && (bankDetails.verifiedAt ? `Verified on ${new Date(bankDetails.verifiedAt).toLocaleDateString()}.` : 'These bank details have been verified.')}
+                        </p>
+                        {bankDetails.verificationNote && status !== 'VERIFIED' && (
+                          <p className="mt-1 text-xs text-slate-400">Your note: {bankDetails.verificationNote}</p>
+                        )}
+                        {status === 'NOT_RECEIVED' && (bankDetails as any).vendorNote && (
+                          <p className="mt-1 text-xs text-red-500">Vendor&apos;s note: {(bankDetails as any).vendorNote}</p>
+                        )}
+                      </div>
+                    </div>
+                    {canManage && status !== 'VERIFIED' && (
+                      <div className="flex items-center gap-2 shrink-0">
+                        {(status === 'PENDING' || status === 'NOT_RECEIVED' || status === 'AMOUNT_SENT') && (
+                          <Button size="sm" onClick={() => setSendModalOpen(true)} disabled={sendBusy}
+                            className="bg-brand-500 hover:bg-brand-600 text-white">
+                            <Send className="h-3.5 w-3.5 mr-1.5" />
+                            {status === 'AMOUNT_SENT' ? 'Resend Amount' : status === 'NOT_RECEIVED' ? 'Resend Amount' : 'Send Verification Amount'}
+                          </Button>
+                        )}
+                        {status === 'RECEIVED' && onVerify && (
+                          <Button size="sm" onClick={onVerify} disabled={loading}
+                            className="bg-green-600 hover:bg-green-700 text-white">
+                            {loading ? <LoadingSpinner size="sm" /> : <><CheckCircle className="h-3.5 w-3.5 mr-1.5" /> Approve Bank Details</>}
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
-            {bankDetails.verifiedAt && (
-              <p className="text-xs text-slate-500">
-                Verified on {new Date(bankDetails.verifiedAt).toLocaleDateString()}
-              </p>
-            )}
+              )
+            })()}
           </div>
         )}
       </CardContent>
     </Card>
+
+    {/* Send verification amount modal */}
+    {sendModalOpen && (
+      <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4" onClick={() => !sendBusy && setSendModalOpen(false)}>
+        <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+            <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2"><CreditCard className="h-5 w-5 text-brand-500" /> Send Verification Amount</h3>
+            <button onClick={() => !sendBusy && setSendModalOpen(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500"><X className="h-5 w-5" /></button>
+          </div>
+          <div className="px-6 py-5 space-y-3">
+            <p className="text-sm text-slate-600">Confirm that you’ve sent a small test amount to the vendor’s bank account. They’ll be notified to confirm receipt.</p>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Note <span className="text-slate-400 font-normal">(optional — e.g. amount / UTR ref)</span></label>
+              <input value={sendNote} onChange={e => setSendNote(e.target.value)} placeholder="₹1 sent · UTR 123456789"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500" />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-2xl">
+            <Button variant="outline" onClick={() => setSendModalOpen(false)} disabled={sendBusy}>Cancel</Button>
+            <Button onClick={doSendAmount} disabled={sendBusy} className="bg-brand-500 hover:bg-brand-600 text-white">
+              {sendBusy ? 'Sending…' : 'Confirm Sent'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
     </>
   )
 }
@@ -2197,7 +2346,9 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
                   <img
                     src={vendor.mainContact.photo}
                     alt={vendor.mainContact.name || 'Contact'}
-                    className="w-20 h-20 rounded-full object-cover border-2 border-slate-200"
+                    onClick={() => openDoc(vendor.mainContact.photo, vendor.mainContact.name || 'Contact Person', true)}
+                    title="View full photo"
+                    className="w-20 h-20 rounded-full object-cover border-2 border-slate-200 cursor-zoom-in transition hover:ring-2 hover:ring-[#e01a1b]/40"
                   />
                 </div>
               )}
@@ -2292,7 +2443,7 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
                 <div key={index} className="border border-slate-200 rounded-lg p-4">
                   <div className="flex items-center gap-3 mb-4">
                     {contact.photo && (
-                      <Image src={contact.photo} alt={contact.name || 'Contact'} width={40} height={40} className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0" />
+                      <Image src={contact.photo} alt={contact.name || 'Contact'} width={40} height={40} onClick={() => openDoc(contact.photo, contact.name || `Contact Person ${index + 2}`, true)} title="View full photo" className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0 cursor-zoom-in transition hover:ring-2 hover:ring-[#e01a1b]/40" />
                     )}
                     <h4 className="font-medium text-slate-900">Contact Person {index + 2}</h4>
                   </div>

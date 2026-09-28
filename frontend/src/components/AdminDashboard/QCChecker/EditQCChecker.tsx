@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Save, User, Mail, Phone, MapPin, Shield, Camera, FileText, Upload, X, RefreshCw } from "lucide-react";
+import { ArrowLeft, Save, User, Mail, Phone, MapPin, Shield, Camera, FileText, Upload, X, RefreshCw, Plus, Trash2, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "../../UI/Card";
 import Dropdown from "../../UI/Dropdown";
@@ -10,6 +10,9 @@ import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { centerNotice } from "@/components/UI/CenterNotice";
 import { qcCheckerService } from "@/services/qcCheckerService";
 import ImageCropModal from "@/components/UI/ImageCropModal";
+import { PhoneInput, validatePhoneE164 } from "@/components/VendorHub/FormUI";
+
+const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 
 const INPUT_CLASS =
   "w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all bg-white";
@@ -71,6 +74,36 @@ export default function EditQCChecker() {
   const idProofInputRef = useRef<HTMLInputElement>(null);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
 
+  // Certifications: up to 5 rows of { name, document }. `documentUrl` is the
+  // already-stored URL for existing certs; `document` is a newly-picked base64 file.
+  type CertRow = { name: string; document?: string; documentUrl?: string; documentName?: string };
+  const MAX_CERTS = 5;
+  const [certs, setCerts] = useState<CertRow[]>([{ name: "" }]);
+  const [certSubmitAttempted, setCertSubmitAttempted] = useState(false);
+  const addCert = () => setCerts((c) => (c.length >= MAX_CERTS ? c : [...c, { name: "" }]));
+  const removeCert = (i: number) => setCerts((c) => (c.length <= 1 ? [{ name: "" }] : c.filter((_, idx) => idx !== i)));
+  const setCertName = (i: number, name: string) => setCerts((c) => c.map((row, idx) => (idx === i ? { ...row, name } : row)));
+  const uploadCertDoc = async (i: number, file: File | null) => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { showErrorToast("File too large", "Document must be under 5MB."); return; }
+    const dataUrl = await readFileAsDataUrl(file);
+    setCerts((c) => c.map((row, idx) => (idx === i ? { ...row, document: dataUrl, documentName: file.name } : row)));
+  };
+  const clearCertDoc = (i: number) => setCerts((c) => c.map((row, idx) => (idx === i ? { ...row, document: undefined, documentUrl: undefined, documentName: undefined } : row)));
+
+  // Contact validation (primary email is read-only here).
+  const [errors, setErrors] = useState<{ alternateEmail?: string; phone?: string; alternatePhone?: string }>({});
+  const validateContact = (): boolean => {
+    const next: typeof errors = {};
+    if (formData.alternateEmail.trim() && !isValidEmail(formData.alternateEmail)) next.alternateEmail = "Enter a valid email address";
+    const phoneErr = validatePhoneE164(formData.phone, { label: "Phone number", required: true });
+    if (phoneErr) next.phone = phoneErr;
+    const altPhoneErr = validatePhoneE164(formData.alternatePhone, { label: "Secondary phone number", isSecondaryPhone: true });
+    if (altPhoneErr) next.alternatePhone = altPhoneErr;
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
   useEffect(() => {
     if (!id) return;
     const load = async () => {
@@ -104,10 +137,16 @@ export default function EditQCChecker() {
           status: (c.status || "ACTIVE").toLowerCase(),
           specialization: c.specialization || "",
           experience: c.experience != null ? String(c.experience) : "",
-          certifications: c.certifications || "",
+          certifications: "",
           profilePhoto: c.profilePhoto || "",
           idProof: c.idProof || "",
         });
+        // Seed the certification rows from the stored value (array of {name,
+        // documentUrl}); a legacy string becomes one name-only row.
+        const certList: CertRow[] = Array.isArray(c.certifications)
+          ? c.certifications.map((x: any) => ({ name: x?.name || "", documentUrl: x?.documentUrl || undefined, documentName: x?.documentUrl ? "Current document" : undefined }))
+          : (typeof c.certifications === "string" && c.certifications ? [{ name: c.certifications }] : []);
+        setCerts(certList.length ? certList : [{ name: "" }]);
         if (c.idProof) setIdProofName("Current ID proof");
       } catch (error: any) {
         showErrorToast("Load Failed", error.message || "Failed to load QC Checker data");
@@ -169,6 +208,17 @@ export default function EditQCChecker() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setCertSubmitAttempted(true);
+    const contactOk = validateContact();
+    // A named certificate must carry a document (a new upload or an existing one).
+    const certMissingDoc = certs.some((c) => c.name.trim() && !c.document && !c.documentUrl);
+    if (!contactOk || certMissingDoc) {
+      showErrorToast(
+        "Check the form",
+        certMissingDoc ? "Please upload a document for each certificate you named." : "Please fix the highlighted email / phone fields.",
+      );
+      return;
+    }
     setIsSubmitting(true);
     try {
       const fullName = [formData.firstName, formData.middleName, formData.lastName].filter(Boolean).join(' ').trim()
@@ -178,7 +228,8 @@ export default function EditQCChecker() {
         phone: formData.phone,
         alternatePhone: formData.alternatePhone || undefined,
         alternateEmail: formData.alternateEmail || undefined,
-        address: [formData.address, formData.addressLine2].filter(Boolean).join(", ") || undefined,
+        address: formData.address || undefined,
+        addressLine2: formData.addressLine2 || undefined,
         city: formData.city || undefined,
         state: formData.state || undefined,
         zipCode: formData.zipCode || undefined,
@@ -188,7 +239,9 @@ export default function EditQCChecker() {
         status: formData.status,
         specialization: formData.specialization || undefined,
         experience: formData.experience || undefined,
-        certifications: formData.certifications || undefined,
+        certifications: certs
+          .filter((c) => c.name.trim())
+          .map((c) => ({ name: c.name.trim(), document: c.document, documentUrl: c.documentUrl })),
         profilePhoto: formData.profilePhoto || undefined,
         idProof: formData.idProof || undefined,
       });
@@ -426,15 +479,14 @@ export default function EditQCChecker() {
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Phone Number <span className="text-brand-500">*</span>
                 </label>
-                <input
-                  type="tel"
-                  name="phone"
+                <PhoneInput
                   value={formData.phone}
-                  onChange={handleInputChange}
-                  placeholder="+91 9876543210"
-                  className={INPUT_CLASS}
-                  required
+                  onChange={(e164) => { setFormData((p) => ({ ...p, phone: e164 })); if (errors.phone) setErrors((p) => ({ ...p, phone: undefined })); }}
+                  onBlur={() => setErrors((p) => ({ ...p, phone: validatePhoneE164(formData.phone, { label: "Phone number", required: true }) || undefined }))}
+                  invalid={!!errors.phone}
+                  placeholder="9876543210"
                 />
+                {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
               </div>
 
               <div>
@@ -444,21 +496,23 @@ export default function EditQCChecker() {
                   name="alternateEmail"
                   value={formData.alternateEmail}
                   onChange={handleInputChange}
+                  onBlur={() => setErrors((p) => ({ ...p, alternateEmail: formData.alternateEmail.trim() && !isValidEmail(formData.alternateEmail) ? "Enter a valid email address" : undefined }))}
                   placeholder="alternate@example.com"
-                  className={INPUT_CLASS}
+                  className={`${INPUT_CLASS} ${errors.alternateEmail ? "border-red-400" : ""}`}
                 />
+                {errors.alternateEmail && <p className="text-xs text-red-500 mt-1">{errors.alternateEmail}</p>}
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Secondary Phone Number</label>
-                <input
-                  type="tel"
-                  name="alternatePhone"
+                <PhoneInput
                   value={formData.alternatePhone}
-                  onChange={handleInputChange}
-                  placeholder="+91 9876543210"
-                  className={INPUT_CLASS}
+                  onChange={(e164) => { setFormData((p) => ({ ...p, alternatePhone: e164 })); if (errors.alternatePhone) setErrors((p) => ({ ...p, alternatePhone: undefined })); }}
+                  onBlur={() => setErrors((p) => ({ ...p, alternatePhone: validatePhoneE164(formData.alternatePhone, { label: "Secondary phone number", isSecondaryPhone: true }) || undefined }))}
+                  invalid={!!errors.alternatePhone}
+                  placeholder="9876543210"
                 />
+                {errors.alternatePhone && <p className="text-xs text-red-500 mt-1">{errors.alternatePhone}</p>}
               </div>
             </div>
           </CardContent>
@@ -581,15 +635,66 @@ export default function EditQCChecker() {
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Certifications</label>
-                <textarea
-                  name="certifications"
-                  value={formData.certifications}
-                  onChange={handleInputChange}
-                  placeholder="List any relevant certifications..."
-                  rows={3}
-                  className={INPUT_CLASS}
-                />
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Certifications <span className="font-normal text-slate-400">(up to {MAX_CERTS})</span>
+                </label>
+                <div className="space-y-3">
+                  {certs.map((cert, i) => {
+                    const hasDoc = !!(cert.documentName || cert.documentUrl);
+                    const docMissing = certSubmitAttempted && !!cert.name.trim() && !hasDoc;
+                    return (
+                    <div key={i} className="flex flex-col sm:flex-row sm:items-start gap-2">
+                      <input
+                        type="text"
+                        value={cert.name}
+                        onChange={(e) => setCertName(i, e.target.value)}
+                        placeholder={`Certification ${i + 1} name`}
+                        className={`${INPUT_CLASS} flex-1`}
+                      />
+                      <div className="sm:w-64">
+                        {hasDoc ? (
+                          <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                            <CheckCircle2 className="h-4 w-4 shrink-0" />
+                            <span className="min-w-0 flex-1 truncate">{cert.documentName || "Document attached"}</span>
+                            <button type="button" onClick={() => clearCertDoc(i)} aria-label="Remove document" className="shrink-0 text-emerald-600 hover:text-emerald-800">
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <label className={`inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50 ${docMissing ? "border-red-400 text-red-600" : "border-slate-300 text-slate-600"}`}>
+                            <Upload className="h-4 w-4" /> Upload document{cert.name.trim() ? " *" : ""}
+                            <input
+                              type="file"
+                              accept="image/*,application/pdf"
+                              className="hidden"
+                              onChange={(e) => { uploadCertDoc(i, e.target.files?.[0] || null); e.target.value = ''; }}
+                            />
+                          </label>
+                        )}
+                        {docMissing && <p className="mt-1 text-xs text-red-500">Document required for a named certificate</p>}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeCert(i)}
+                        aria-label="Remove certification"
+                        className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                    );
+                  })}
+                </div>
+                {certs.length < MAX_CERTS && (
+                  <button
+                    type="button"
+                    onClick={addCert}
+                    className="mt-3 inline-flex items-center gap-2 rounded-lg border border-brand-300 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-600 hover:bg-brand-100 transition-colors"
+                  >
+                    <Plus className="h-4 w-4" /> Add Certificate
+                  </button>
+                )}
+                <p className="mt-1.5 text-xs text-slate-500">Each certificate: enter a name and optionally attach its document (image or PDF, up to 5MB).</p>
               </div>
             </div>
           </CardContent>

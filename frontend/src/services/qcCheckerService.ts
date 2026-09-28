@@ -2,6 +2,16 @@ import axios from '@/lib/axios';
 import axiosLib from 'axios';
 import type { ProductDetailData } from '@/types/inspection';
 
+/** A single certification: a name plus an optional supporting document.
+ *  On create/edit `document` carries a base64 data URL to upload; reads return
+ *  `documentUrl` (the stored Cloudinary URL). */
+export interface QCCertification {
+    name: string;
+    document?: string;     // base64 data URL when submitting a new file
+    documentUrl?: string;  // stored URL returned by the API
+    documentName?: string; // original filename (UI only)
+}
+
 export interface QCCheckerData {
     id: string;
     checkerId: string;
@@ -23,7 +33,7 @@ export interface QCCheckerData {
     joiningDate: string;
     specialization?: string;
     experience?: number;
-    certifications?: string;
+    certifications?: string | QCCertification[];
     assignedHubId?: string;
     status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
     isActive: boolean;
@@ -88,7 +98,7 @@ export interface CreateQCCheckerData {
     status?: string;
     specialization?: string;
     experience?: string;
-    certifications?: string;
+    certifications?: string | QCCertification[];
     assignedHubId?: string;
 }
 

@@ -6,7 +6,6 @@ import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import Dropdown from '@/components/UI/Dropdown'
-import { getRegion } from '@/lib/currency'
 import { ArrowLeft, Save, X, Upload, Package, Image as ImageIcon, ChevronLeft, ChevronRight, Pencil } from 'lucide-react'
 import CareInstructionModal, { CareIcon, CARE_INSTRUCTIONS, CATEGORY_COLORS } from './CareInstructionModal'
 import ResultModal from '@/components/UI/ResultModal'
@@ -169,6 +168,8 @@ interface ProductFormData {
   gstPercentage?: number
   hsnCode?: string
   returnable?: boolean
+  packagingType?: 'PACKED' | 'UNPACKED' | '' // How the product ships
+  packingType?: 'BALE' | 'CARTON' | '' // Pack style when packed
 
   // Basic Product Info - Size & Color
   singleUnitSize?: string
@@ -267,6 +268,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     gstPercentage: undefined,
     hsnCode: '',
     returnable: true,
+    packagingType: '',
+    packingType: '',
 
     // Basic Product Info - Size & Color
     singleUnitSize: '',
@@ -635,7 +638,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   }, [formData.hasVariants, formData.variants])
 
   // Auto-calculate GSM from fabric weight (g) and dimensions (cm):
-  //   GSM = (Weight × 10000) ÷ (Length × Breadth)
+  //   GSM = (Weight × 10000) ÷ (Length × Width)
   useEffect(() => {
     const w = parseFloat(formData.fabricSpecifications.weightValue)
     const l = parseFloat(formData.fabricSpecifications.length)
@@ -676,6 +679,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
               gstPercentage: product.gstPercentage,
               hsnCode: product.hsnCode || '',
               returnable: (product as any).returnable !== false,
+              packagingType: ((product as any).packagingType as 'PACKED' | 'UNPACKED' | undefined) || '',
+              packingType: ((product as any).packingType as 'BALE' | 'CARTON' | undefined) || '',
 
               // Basic Product Info - Size & Color
               singleUnitSize: (product as any).singleUnitSize || '',
@@ -1282,6 +1287,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
         fabricType: formData.fabricType === 'Others' ? otherFabricType : formData.fabricType,
       }
       delete submitData.dimensionUnit
+      // Return eligibility is admin-controlled — never sent from the vendor form.
+      delete submitData.returnable
 
       let response
       if (isEdit && productId) {
@@ -1680,25 +1687,49 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       />
                       <p className="text-xs text-slate-500 mt-1">HSN code for GST classification</p>
                     </div>
-                    {/* Returns are a .in-only feature — hide this control on .com. */}
-                    {getRegion() === 'IN' && (
+                    {/* Return eligibility is set by the admin (product add/edit and
+                        final approval) — not by the vendor — since it governs the
+                        customer's return option on the website. */}
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        Return Applicable
+                        Packaging
                       </label>
                       <Dropdown
                         label=""
-                        value={formData.returnable === false ? 'no' : 'yes'}
+                        value={formData.packagingType || ''}
                         options={[
-                          { value: 'yes', label: 'Yes — returns allowed' },
-                          { value: 'no', label: 'No — no returns' },
+                          { value: '', label: 'Select packaging…' },
+                          { value: 'PACKED', label: 'Packed' },
+                          { value: 'UNPACKED', label: 'Unpacked' },
                         ]}
-                        placeholder="Select"
-                        onChange={(value) => setFormData(prev => ({ ...prev, returnable: value === 'yes' }))}
+                        placeholder="Select packaging…"
+                        buttonClassName="py-2.5 rounded-lg"
+                        onChange={(value) => setFormData(prev => ({
+                          ...prev,
+                          packagingType: value as 'PACKED' | 'UNPACKED' | '',
+                          packingType: value === 'PACKED' ? prev.packingType : '',
+                        }))}
                       />
-                      <p className="text-xs text-slate-500 mt-1">
-                        When Yes, customers can raise a return within 7 days of delivery. When No, the return option is hidden for this product.
-                      </p>
+                      <p className="text-xs text-slate-500 mt-1">Is this product shipped packed or unpacked?</p>
+                    </div>
+                    {formData.packagingType === 'PACKED' && (
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        Pack Style
+                      </label>
+                      <Dropdown
+                        label=""
+                        value={formData.packingType || ''}
+                        options={[
+                          { value: '', label: 'Select pack style…' },
+                          { value: 'BALE', label: 'Bale pack' },
+                          { value: 'CARTON', label: 'Carton box' },
+                        ]}
+                        placeholder="Select pack style…"
+                        buttonClassName="py-2.5 rounded-lg"
+                        onChange={(value) => setFormData(prev => ({ ...prev, packingType: value as 'BALE' | 'CARTON' | '' }))}
+                      />
+                      <p className="text-xs text-slate-500 mt-1">How is the packed product bundled?</p>
                     </div>
                     )}
                     <div>
@@ -1799,8 +1830,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   <CardTitle>Fabric Type & Specifications</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Row 1: Fabric Type | Material Description */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Row 1: Fabric Type | Material Description | Composition */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div id="vf-fabricType">
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
                         Fabric Type <span className="text-red-500">*</span>
@@ -1856,10 +1887,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         placeholder="e.g., 100% Organic Cotton"
                       />
                     </div>
-                  </div>
 
-                  {/* Row 2: Composition | Weight | Unit of Measurement */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
                         Composition
@@ -1873,7 +1901,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         placeholder="e.g., 100% Cotton"
                       />
                     </div>
+                  </div>
 
+                  {/* Row 2: Weight | Length | Width | GSM */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
                         Weight (g)
@@ -1908,7 +1939,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        Breadth (cm)
+                        Width (cm)
                       </label>
                       <input
                         type="number"
@@ -1933,9 +1964,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         value={formData.fabricSpecifications.gsm || ''}
                         className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 bg-slate-100 cursor-not-allowed"
                         placeholder="—"
-                        title="GSM = (Weight in g × 10000) ÷ (Length in cm × Breadth in cm)"
+                        title="GSM = (Weight in g × 10000) ÷ (Length in cm × Width in cm)"
                       />
-                      <p className="mt-1 text-xs text-slate-400">GSM = (Weight × 10000) ÷ (Length × Breadth)</p>
+                      <p className="mt-1 text-xs text-slate-400">GSM = (Weight × 10000) ÷ (Length × Width)</p>
                     </div>
                   </div>
 

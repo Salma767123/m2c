@@ -173,6 +173,8 @@ interface ProductFormData {
   gstPercentage?: number // GST Percentage for the product
   hsnCode?: string // HSN / SAC code for GST classification
   returnable?: boolean // Whether customers can return this product (within 7 days of delivery)
+  packagingType?: 'PACKED' | 'UNPACKED' | '' // How the product ships
+  packingType?: 'BALE' | 'CARTON' | '' // Pack style when PACKED
   adminFixedPrice?: number | null
   priceINR?: number | null
   priceUSD?: number | null
@@ -313,6 +315,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
     gstPercentage: undefined,
     hsnCode: '',
     returnable: true,
+    packagingType: '',
+    packingType: '',
     adminFixedPrice: null,
     priceINR: null,
     priceUSD: null,
@@ -470,7 +474,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
   }, [formData.category, formData.subCategory])
 
   // Auto-calculate GSM from fabric weight (g) and dimensions (cm):
-  //   GSM = (Weight × 10000) ÷ (Length × Breadth)  — mirrors the vendor form.
+  //   GSM = (Weight × 10000) ÷ (Length × Width)  — mirrors the vendor form.
   useEffect(() => {
     const w = parseFloat(formData.fabricSpecifications.weightValue)
     const l = parseFloat(formData.fabricSpecifications.length)
@@ -654,6 +658,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
               gstPercentage: product.gstPercentage,
               hsnCode: product.hsnCode || '',
               returnable: product.returnable !== false,
+              packagingType: (product.packagingType as 'PACKED' | 'UNPACKED' | undefined) || '',
+              packingType: (product.packingType as 'BALE' | 'CARTON' | undefined) || '',
               adminFixedPrice: product.adminFixedPrice || null,
               priceINR: product.priceINR || null,
               priceUSD: product.priceUSD || null,
@@ -1835,6 +1841,47 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                     )}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Packaging
+                      </label>
+                      <Dropdown
+                        label=""
+                        value={formData.packagingType || ''}
+                        options={[
+                          { value: '', label: 'Select packaging…' },
+                          { value: 'PACKED', label: 'Packed' },
+                          { value: 'UNPACKED', label: 'Unpacked' },
+                        ]}
+                        placeholder="Select packaging…"
+                        onChange={(value) => setFormData(prev => ({
+                          ...prev,
+                          packagingType: value as 'PACKED' | 'UNPACKED' | '',
+                          // Clear the pack style when not packed.
+                          packingType: value === 'PACKED' ? prev.packingType : '',
+                        }))}
+                      />
+                      <p className="text-xs text-slate-500 mt-1">Is this product shipped packed or unpacked?</p>
+                    </div>
+                    {formData.packagingType === 'PACKED' && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Pack Style
+                      </label>
+                      <Dropdown
+                        label=""
+                        value={formData.packingType || ''}
+                        options={[
+                          { value: '', label: 'Select pack style…' },
+                          { value: 'BALE', label: 'Bale pack' },
+                          { value: 'CARTON', label: 'Carton box' },
+                        ]}
+                        placeholder="Select pack style…"
+                        onChange={(value) => setFormData(prev => ({ ...prev, packingType: value as 'BALE' | 'CARTON' | '' }))}
+                      />
+                      <p className="text-xs text-slate-500 mt-1">How is the packed product bundled?</p>
+                    </div>
+                    )}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
                         Base Color
                       </label>
                       <div className="space-y-2">
@@ -1931,31 +1978,32 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                   <CardTitle>Fabric Type & Specifications</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div>
-                    <Dropdown
-                      label="Fabric Type *"
-                      value={formData.fabricType}
-                      options={fabricTypes}
-                      placeholder="Select Fabric Type"
-                      onChange={(value) => setFormData(prev => ({ ...prev, fabricType: value as string }))}
-                    />
-                  </div>
+                  {/* Row 1: Fabric Type | Material Description | Composition */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                      <Dropdown
+                        label="Fabric Type *"
+                        value={formData.fabricType}
+                        options={fabricTypes}
+                        placeholder="Select Fabric Type"
+                        onChange={(value) => setFormData(prev => ({ ...prev, fabricType: value as string }))}
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Material Description
-                    </label>
-                    <input
-                      type="text"
-                      name="material"
-                      value={formData.material}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
-                      placeholder="e.g., 100% Organic Cotton"
-                    />
-                  </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Material Description
+                      </label>
+                      <input
+                        type="text"
+                        name="material"
+                        value={formData.material}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
+                        placeholder="e.g., 100% Organic Cotton"
+                      />
+                    </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
                         Composition
@@ -1969,6 +2017,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                         placeholder="e.g., 100% Cotton"
                       />
                     </div>
+                  </div>
+
+                  {/* Row 2: Weight | Length | Width | GSM */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
                         Weight (g)
@@ -1983,9 +2035,6 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                         min="0"
                       />
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
                         Length (cm)
@@ -2002,7 +2051,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Breadth (cm)
+                        Width (cm)
                       </label>
                       <input
                         type="number"
@@ -2025,9 +2074,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                         value={formData.fabricSpecifications.gsm || ''}
                         className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm font-semibold text-slate-700 bg-slate-100 cursor-not-allowed"
                         placeholder="—"
-                        title="GSM = (Weight in g × 10000) ÷ (Length in cm × Breadth in cm)"
+                        title="GSM = (Weight in g × 10000) ÷ (Length in cm × Width in cm)"
                       />
-                      <p className="mt-1 text-xs text-slate-400">GSM = (Weight × 10000) ÷ (Length × Breadth)</p>
+                      <p className="mt-1 text-xs text-slate-400">GSM = (Weight × 10000) ÷ (Length × Width)</p>
                     </div>
                   </div>
 

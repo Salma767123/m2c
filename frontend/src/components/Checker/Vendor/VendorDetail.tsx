@@ -665,7 +665,14 @@ export default function VendorDetail({
                         <div>
                           <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Product Inspection Site</label>
                           <p className="text-sm font-semibold text-brand-600">
-                            {String((vd as any).productInspectionSite).toUpperCase() === 'WAREHOUSE' ? 'Warehouse address' : 'Legal / Factory address'}
+                            {(() => {
+                              const sites = Array.isArray((vd as any).productInspectionSites) && (vd as any).productInspectionSites.length
+                                ? (vd as any).productInspectionSites
+                                : ((vd as any).productInspectionSite ? [(vd as any).productInspectionSite] : []);
+                              return sites.length
+                                ? sites.map((s: string) => String(s).toUpperCase() === 'WAREHOUSE' ? 'Warehouse address' : 'Legal / Factory address').join(' & ')
+                                : 'Legal / Factory address';
+                            })()}
                           </p>
                         </div>
                         {vd.warehouseAddress && (

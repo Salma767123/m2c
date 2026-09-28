@@ -553,7 +553,7 @@ function OverviewTab({ product, primaryImage }: { product: ProductDetailData; pr
                                 {fs?.composition != null && fs.composition !== '' && <Row icon={<Layers className="w-4 h-4" />} label="Composition" value={String(fs.composition)} />}
                                 {fs?.weightValue != null && fs.weightValue !== '' && <Row icon={<Layers className="w-4 h-4" />} label="Weight" value={`${fs.weightValue} g`} />}
                                 {fs?.length != null && fs.length !== '' && <Row icon={<Layers className="w-4 h-4" />} label="Length" value={`${fs.length} cm`} />}
-                                {fs?.breadth != null && fs.breadth !== '' && <Row icon={<Layers className="w-4 h-4" />} label="Breadth" value={`${fs.breadth} cm`} />}
+                                {fs?.breadth != null && fs.breadth !== '' && <Row icon={<Layers className="w-4 h-4" />} label="Width" value={`${fs.breadth} cm`} />}
                                 {fs?.gsm != null && fs.gsm !== '' && <Row icon={<Layers className="w-4 h-4" />} label="GSM" value={`${fs.gsm} GSM`} />}
                                 {/* Legacy single weight (older products, pre-GSM fields). */}
                                 {(fs?.gsm == null || fs.gsm === '') && (fs?.weightValue == null || fs.weightValue === '') && fs?.weight != null && fs.weight !== '' && <Row icon={<Layers className="w-4 h-4" />} label="Weight (GSM)" value={String(fs.weight)} />}

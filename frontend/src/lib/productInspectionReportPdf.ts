@@ -333,6 +333,25 @@ export function generateProductInspectionPdf(
 
     // ── E. Packaging Inspection ────────────────────────────────────────────────
     sectionTitle("E. Packaging Inspection")
+    // Packaging mode (from the vendor's product): drives which sections apply.
+    const pkgMode = String((formData as any).packagingType || "").toUpperCase()
+    const packLabel = pkgMode === "PACKED"
+        ? `Packed${(formData as any).packingType ? ` — ${String((formData as any).packingType).toUpperCase() === "BALE" ? "Bale pack" : "Carton box"}` : ""}`
+        : pkgMode === "UNPACKED" ? "Unpacked" : null
+    if (packLabel) {
+        ensureSpace(30)
+        doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...SLATE)
+        doc.text(`Packaging Mode: ${packLabel}`, margin, y); y += 14
+        if (pkgMode === "UNPACKED") {
+            doc.setFont("helvetica", "italic"); doc.setTextColor(...MUTED)
+            doc.text(
+                "Unpacked product — Shipper/Inner Carton & Retail Packaging, and the Packaging Verification, Measurement & Functional test sections are not applicable.",
+                margin, y, { maxWidth: contentW },
+            )
+            y += 26
+            doc.setTextColor(...SLATE)
+        }
+    }
     const pkgItems: any[] = Array.isArray(formData.packagingItems) ? formData.packagingItems : []
     if (pkgItems.length === 0) {
         doc.setFont("helvetica", "italic")
@@ -554,8 +573,9 @@ export function generateProductInspectionPdf(
 
     // ── Signature block ────────────────────────────────────────────────────────
     const sig = options.clientSignatureDataUrl
-    ensureSpace(160)
-    y = Math.max(y, pageH - margin - 150)
+    const hasDur = meta.totalDurationMs != null && meta.totalDurationMs > 0
+    ensureSpace(hasDur ? 236 : 160)
+    y = Math.max(y, pageH - margin - (hasDur ? 216 : 150))
 
     doc.setDrawColor(...BRAND)
     doc.setLineWidth(0.5)
@@ -585,6 +605,17 @@ export function generateProductInspectionPdf(
     doc.setFont("helvetica", "normal")
     doc.text(completeTimeStr, margin + 148, blockY + 66)
 
+    // Active / Paused / Total durations (only when time tracking is available).
+    if (hasDur) {
+        const durValX = margin + 130
+        doc.setFont("helvetica", "bold"); doc.text("Active Duration:", margin, blockY + 88)
+        doc.setFont("helvetica", "normal"); doc.text(formatDuration(meta.activeDurationMs || 0), durValX, blockY + 88)
+        doc.setFont("helvetica", "bold"); doc.text("Paused Duration:", margin, blockY + 110)
+        doc.setFont("helvetica", "normal"); doc.text(formatDuration(meta.pausedDurationMs || 0), durValX, blockY + 110)
+        doc.setFont("helvetica", "bold"); doc.text("Total Duration:", margin, blockY + 132)
+        doc.setFont("helvetica", "normal"); doc.text(`${formatDuration(meta.totalDurationMs || 0)}${meta.exceededSchedule ? "  (over schedule)" : ""}`, durValX, blockY + 132)
+    }
+
     // Right: Client Signature section
     const sigX = margin + contentW / 2
     doc.setFont("helvetica", "bold")
@@ -603,8 +634,8 @@ export function generateProductInspectionPdf(
         doc.setTextColor(...MUTED)
         doc.text(`Digitally signed  ·  ${fmtDateTime(generatedAt)}`, sigX, blockY + 74)
     } else {
-        // Manual report — "Client Signature & Seal:" + blank line (no "Signature / Date")
-        doc.text("Client Signature & Seal:", sigX, blockY)
+        // Manual report — "Client Seal & Signature:" + blank line (no "Signature / Date")
+        doc.text("Client Seal & Signature:", sigX, blockY)
         doc.setDrawColor(...MUTED)
         doc.setLineWidth(0.5)
         doc.line(sigX, blockY + 50, sigX + 180, blockY + 50)
@@ -623,9 +654,8 @@ export function generateProductInspectionPdf(
         doc.setFont("helvetica", "bold")
         doc.setFontSize(9)
         doc.setTextColor(...color)
-        // A full line below "Inspection Complete Time" (blockY + 66) so it no
-        // longer overlaps that row.
-        doc.text(`Status: ${status}`, margin, blockY + 92)
+        // Below the last line — after the duration rows when present.
+        doc.text(`Status: ${status}`, margin, blockY + (hasDur ? 158 : 92))
         doc.setTextColor(...SLATE)
     }
 

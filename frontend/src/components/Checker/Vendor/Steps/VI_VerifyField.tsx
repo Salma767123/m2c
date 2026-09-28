@@ -3,6 +3,7 @@
 import React, { useContext, createContext, useState } from 'react'
 import { FileText, ExternalLink, Eye, Phone, Mail, Send, Check, Loader2 } from 'lucide-react'
 import DocViewerModal from '@/components/UI/DocViewerModal'
+import { openDoc as openImageViewer } from '@/lib/docViewerBus'
 import qcCheckerService from '@/services/qcCheckerService'
 import { toExternalUrl } from '@/lib/utils'
 
@@ -135,8 +136,16 @@ export function renderValue(value: any, type?: string, label?: string): React.Re
     if (isPhone) return <PhoneValue value={value.trim()} />
   }
   if (type === 'image' || (type !== 'document' && typeof value === 'string' && isImageUrl(value))) {
+    // Click the thumbnail (logo, owner/contact photos, any image field) to open
+    // the full image in the shared viewer.
     return (
-      <img src={value} alt="Uploaded" className="w-20 h-20 object-cover rounded-lg border border-slate-200" />
+      <img
+        src={value}
+        alt={label || 'Uploaded'}
+        onClick={() => openImageViewer(value, label || 'Image', true)}
+        title="View full image"
+        className="w-20 h-20 object-cover rounded-lg border border-slate-200 cursor-zoom-in transition hover:ring-2 hover:ring-brand-400/50"
+      />
     )
   }
   if (type === 'document' && typeof value === 'string') {

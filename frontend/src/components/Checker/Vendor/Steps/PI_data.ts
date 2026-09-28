@@ -157,7 +157,7 @@ const VERIFICATION_FIELD_LABELS: Record<string, string> = {
 }
 
 const VERIFICATION_SPEC_LABELS: Record<string, string> = {
-  weightValue: 'Weight', weave: 'Weave Type', gsm: 'GSM', length: 'Length', breadth: 'Breadth',
+  weightValue: 'Weight', weave: 'Weave Type', gsm: 'GSM', length: 'Length', breadth: 'Width',
   careInstructions: 'Care Instructions',
 }
 
@@ -213,4 +213,51 @@ export function makeDefaultAdditionalEvidence(): Record<string, any[]> {
   const out: Record<string, any[]> = {}
   ADDITIONAL_EVIDENCE_DEFS.forEach(d => { out[d.id] = [] })
   return out
+}
+
+// ── Packaging-mode driven form shaping ──────────────────────────────────────
+// A product carries packagingType ('PACKED' | 'UNPACKED') and, when packed,
+// packingType ('BALE' | 'CARTON'), set by the vendor. These drive the QC form:
+//   • UNPACKED  → the packaging-specific sections are skipped entirely.
+//   • PACKED    → the Measurement/Functional groups' Carton/Bale toggle is
+//                 pre-selected to match the vendor's packingType.
+
+// Packaging items shown only when the product is PACKED (skipped for UNPACKED).
+export const PACKED_ONLY_PACKAGING_ITEM_IDS = new Set<string>(['shipperCarton', 'innerCarton', 'retailPackaging'])
+// Test groups shown only when the product is PACKED (skipped for UNPACKED).
+export const PACKED_ONLY_TEST_GROUP_IDS = new Set<string>(['packagingVerification', 'measurementInspection', 'functionalTests'])
+
+/** Is this product marked UNPACKED by the vendor? */
+export function isProductUnpacked(product?: { packagingType?: string | null } | null): boolean {
+  return String(product?.packagingType || '').toUpperCase() === 'UNPACKED'
+}
+
+/** Map the product's packingType ('BALE' | 'CARTON') to the Carton/Bale toggle value. */
+export function packingTypeToToggle(packingType?: string | null): 'Carton' | 'Bale' {
+  return String(packingType || '').toUpperCase() === 'BALE' ? 'Bale' : 'Carton'
+}
+
+/** Filter packaging items for the product's packaging mode (drops carton-only items when UNPACKED). */
+export function packagingItemsForMode(items: PackagingItem[], unpacked: boolean): PackagingItem[] {
+  if (!unpacked) return items
+  return items.filter(it => !PACKED_ONLY_PACKAGING_ITEM_IDS.has(it.id))
+}
+
+/**
+ * Filter + seed test groups for the product's packaging mode:
+ *   • UNPACKED → drops the packaging/measurement/functional groups.
+ *   • PACKED   → sets the Carton/Bale toggle on the toggle groups to `toggle`
+ *                and relabels their (non-custom) test names to match.
+ */
+export function testGroupsForMode(groups: TestGroup[], unpacked: boolean, toggle: 'Carton' | 'Bale'): TestGroup[] {
+  const kept = unpacked ? groups.filter(g => !PACKED_ONLY_TEST_GROUP_IDS.has(g.id)) : groups
+  return kept.map(g => {
+    if (!PACKAGING_TOGGLE_GROUPS.includes(g.id as any)) return g
+    if ((g.packagingType || 'Carton') === toggle) return g
+    return {
+      ...g,
+      packagingType: toggle,
+      tests: g.tests.map(t => (t.isOther ? t : { ...t, label: relabelForPackaging(t.label, toggle) })),
+    }
+  })
 }

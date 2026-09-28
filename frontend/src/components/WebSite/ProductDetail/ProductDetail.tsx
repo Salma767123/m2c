@@ -1161,7 +1161,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
     ? (product.fabricSpecifications as Record<string, any>) : {};
   const specItems = (() => {
     const FS_LABELS: Record<string, string> = {
-      weightValue: 'Fabric Weight', gsm: 'GSM', length: 'Length', breadth: 'Breadth',
+      weightValue: 'Fabric Weight', gsm: 'GSM', length: 'Length', breadth: 'Width',
       weave: 'Type of Weave', composition: 'Composition',
     };
     const FS_UNITS: Record<string, string> = { weightValue: 'g', length: 'cm', breadth: 'cm', gsm: 'GSM' };
@@ -1188,6 +1188,12 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
         out.push({ label, value });
       });
     if (product.hasVariants) out.push({ label: 'Variants', value: String(visibleVariants.length) });
+    if (product.packagingType) {
+      const packLabel = product.packagingType === 'PACKED'
+        ? `Packed${product.packingType === 'BALE' ? ' — Bale pack' : product.packingType === 'CARTON' ? ' — Carton box' : ''}`
+        : 'Unpacked';
+      out.push({ label: 'Packaging', value: packLabel });
+    }
     out.push({ label: 'Availability', value: availableStock > 0 ? `In stock (${availableStock})` : 'Out of stock' });
     out.push({
       label: 'Return Policy',
@@ -1538,7 +1544,10 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                           score is not one we would advertise. */}
                       <div className="flex items-center flex-wrap gap-2 sm:gap-x-4 sm:gap-y-2 mb-1 sm:mb-1.5">
                         {(() => {
-                          const n = product.reviews || 0;
+                          // Once the approved reviews have loaded, trust their actual
+                          // count so this header always matches the reviews section
+                          // below (the stored product.reviews aggregate can lag).
+                          const n = loadingReviews ? (product.reviews || 0) : reviews.length;
                           const face = positiveFace(Number(product.rating) || 0);
                           if (n === 0) return <span className="text-[13px] font-medium text-gray-400 sm:text-sm">No reviews yet</span>;
                           return (
@@ -1550,7 +1559,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                             </span>
                           );
                         })()}
-                        {product.reviews != null && product.reviews > 0 ? (
+                        {(loadingReviews ? (product.reviews || 0) : reviews.length) > 0 ? (
                           <button
                             onClick={() => document.getElementById('customer-reviews')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
                             className="text-xs sm:text-sm text-[#e01a1b] hover:text-[#c41617] cursor-pointer font-medium"

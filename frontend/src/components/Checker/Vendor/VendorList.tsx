@@ -113,13 +113,29 @@ interface RawVendor {
   inspections?: Array<{ status?: string | null; result?: string | null; cycleNumber?: number | null; scheduledDate?: string | null; scheduledTime?: string | null }>
 }
 
+// Normalise a stored scheduled time to 12-hour AM/PM. Handles 24-hour "19:23"
+// (converts → "7:23 PM") and passes through values that already carry AM/PM.
+function to12Hour(t?: string): string | undefined {
+  if (!t) return undefined
+  const s = t.trim()
+  if (/[ap]\.?m\.?/i.test(s)) return s.replace(/\s+/g, " ").toUpperCase() // already 12h
+  const m = s.match(/^(\d{1,2}):(\d{2})/)
+  if (!m) return s
+  let h = parseInt(m[1], 10)
+  const min = m[2]
+  const ampm = h >= 12 ? "PM" : "AM"
+  h = h % 12
+  if (h === 0) h = 12
+  return `${h}:${min} ${ampm}`
+}
+
 function transformVendor(v: RawVendor): Vendor {
   const latestInspection = v.inspections && v.inspections.length > 0 ? v.inspections[0] : null
 
   // "Assigned Date" now shows the inspection's booked window — scheduledDate
-  // (YYYY-MM-DD) + scheduledTime (e.g. "08:16 AM"), the same values the admin set.
+  // (YYYY-MM-DD) + scheduledTime shown in 12-hour AM/PM, the values the admin set.
   const schedYmd = latestInspection?.scheduledDate || undefined
-  const schedTime = latestInspection?.scheduledTime || undefined
+  const schedTime = to12Hour(latestInspection?.scheduledTime || undefined)
   const schedDateObj = schedYmd ? new Date(`${schedYmd}T00:00:00`) : null
   const assignedDate = schedDateObj && !isNaN(schedDateObj.getTime())
     ? `${schedDateObj.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}${schedTime ? ` · ${schedTime}` : ""}`

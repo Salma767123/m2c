@@ -309,7 +309,7 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
                     weave: 'Weave Type',
                     gsm: 'GSM',
                     length: 'Length',
-                    breadth: 'Breadth',
+                    breadth: 'Width',
                   }
                   const SPEC_UNIT_MAP: Record<string, string> = {
                     weightValue: 'g', length: 'cm', breadth: 'cm', gsm: 'GSM',
@@ -352,8 +352,11 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
         <SectionBlock title="Packaging Information" icon={<Package className="w-4 h-4" />}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {notEmpty(p.packagingType) && (
-              <VerifyField fieldKey="pv_packagingType" label="Packaging Type" value={p.packagingType}
-                verifications={verifications} onChange={onVerify} />
+              <VerifyField fieldKey="pv_packagingType" label="Packaging Type" value={
+                String(p.packagingType).toUpperCase() === 'PACKED'
+                  ? `Packed${p.packingType ? ` — ${String(p.packingType).toUpperCase() === 'BALE' ? 'Bale pack' : 'Carton box'}` : ''}`
+                  : String(p.packagingType).toUpperCase() === 'UNPACKED' ? 'Unpacked' : p.packagingType
+              } verifications={verifications} onChange={onVerify} />
             )}
             {notEmpty(p.packagingMaterial) && (
               <VerifyField fieldKey="pv_packagingMaterial" label="Packaging Material" value={p.packagingMaterial}

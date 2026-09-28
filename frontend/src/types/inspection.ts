@@ -141,6 +141,9 @@ export interface ProductDetailData {
    *  "last inspected" time (approvedAt is only set on the later admin decision). */
   lastReviewedAt?: string | null
   rejectionReason?: string | null
+  /** Vendor-set packaging mode that drives the QC form (skips/auto-selects sections). */
+  packagingType?: string | null
+  packingType?: string | null
   qcInspectionData?: Record<string, unknown> | null
   inspectionCycleNumber?: number
   previousInspectionData?: Array<{

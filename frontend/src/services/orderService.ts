@@ -168,6 +168,18 @@ export interface Order {
     hubLocation?: { city?: string | null; state?: string | null } | null;
 }
 
+export interface ReorderResult {
+    success: boolean;
+    message?: string;
+    data: {
+        added: { name: string; quantity: number; capped?: boolean }[];
+        skipped: { name: string; reason: string }[];
+        addedCount: number;
+        skippedCount: number;
+        itemCount: number;
+    };
+}
+
 export interface CreateOrderParams {
     shippingAddress: {
         street: string;
@@ -269,6 +281,18 @@ class OrderService {
             return response.data;
         } catch (error: any) {
             throw new Error(error.message || 'Failed to submit return request');
+        }
+    }
+
+    // Customer "Buy Again": re-add a past order's items to the cart. Items that
+    // are unavailable / out of stock / out of region are skipped and reported.
+    async reorder(id: string): Promise<ReorderResult> {
+        try {
+            const { getCurrency } = await import('@/lib/currency');
+            const response = await axios.post(`/orders/${id}/reorder`, { currency: getCurrency() });
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error?.response?.data?.error || error.message || 'Failed to add items to cart');
         }
     }
 

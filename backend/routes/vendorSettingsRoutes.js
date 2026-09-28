@@ -8,6 +8,7 @@ const {
   // Bank Details
   getVendorBankDetails,
   upsertVendorBankDetails,
+  respondBankVerification,
   
   // Document Management
   getVendorDocuments,
@@ -61,6 +62,9 @@ router.get('/bank-details', getVendorBankDetails);
 
 // Create or update vendor bank details
 router.put('/bank-details', upsertVendorBankDetails);
+
+// Vendor confirms/denies receipt of the admin's test amount (penny-drop handshake)
+router.put('/bank-details/verification-response', respondBankVerification);
 
 // ============================================
 // DOCUMENT MANAGEMENT ROUTES

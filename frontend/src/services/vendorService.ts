@@ -103,8 +103,11 @@ export interface VendorRegistrationData {
    *  "same as legal address". */
   warehouseLatitude?: string;
   warehouseLongitude?: string;
-  /** Where products are handled — the site a QC product inspection geofences against. */
+  /** Where products are handled — the site(s) a QC product inspection geofences against.
+   *  Multi-select: the vendor may pick FACTORY, WAREHOUSE, or both. The legacy single
+   *  `productInspectionSite` mirrors the first for older read paths. */
   productInspectionSite?: 'FACTORY' | 'WAREHOUSE';
+  productInspectionSites?: ('FACTORY' | 'WAREHOUSE')[];
 
   // Vendor Type & Products
   vendorType: string | string[];
@@ -351,8 +354,9 @@ export interface VendorProfile {
   factoryLongitude?: number | null;
   warehouseLatitude?: number | null;
   warehouseLongitude?: number | null;
-  /** Where products are handled — the site a QC product inspection geofences against. */
+  /** Where products are handled — the site(s) a QC product inspection geofences against. */
   productInspectionSite?: 'FACTORY' | 'WAREHOUSE' | null;
+  productInspectionSites?: ('FACTORY' | 'WAREHOUSE')[] | null;
   /** Step 6 free-text logistics / compliance fields. */
   packagingCapabilities?: string;
   logisticsPartners?: string;
@@ -458,10 +462,17 @@ export interface VendorBankDetails {
   ifscCode: string;
   accountType: string;
   accountHolderName: string;
+  legalEntity?: string;
   branchName?: string;
   branchAddress?: string;
   isVerified?: boolean;
   verifiedAt?: string;
+  // Penny-drop verification handshake
+  verificationStatus?: 'PENDING' | 'AMOUNT_SENT' | 'RECEIVED' | 'NOT_RECEIVED' | 'VERIFIED';
+  amountSentAt?: string | null;
+  vendorRespondedAt?: string | null;
+  verificationNote?: string | null;
+  vendorNote?: string | null;
 }
 
 export interface VendorDocument {
@@ -1180,6 +1191,25 @@ class VendorService {
     } catch (error) {
       throw error;
     }
+  }
+
+  // Admin: mark a penny-drop verification amount as sent to the vendor.
+  static async sendBankVerificationAmount(vendorId: string, note?: string) {
+    const token = this.getAdminToken();
+    if (!token) throw new Error('No admin authentication token found');
+    const response = await axiosInstance.put(
+      `/vendors/${vendorId}/bank-verification/send`,
+      { note },
+      { headers: { 'Authorization': `Bearer ${token}` } },
+    );
+    return response.data;
+  }
+
+  // Vendor: confirm / deny receipt of the admin's verification amount (with an
+  // optional note — e.g. why they haven't received it).
+  static async respondBankVerification(received: boolean, note?: string) {
+    const response = await axiosInstance.put('/vendor-settings/bank-details/verification-response', { received, note });
+    return response.data;
   }
 
   // Admin: Assign QC Checker & Create Inspection
