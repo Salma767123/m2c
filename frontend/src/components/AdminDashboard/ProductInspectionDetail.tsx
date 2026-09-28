@@ -496,6 +496,20 @@ export default function ProductInspectionDetail({ productId, context }: Props) {
 
                 {/* Section 2: Packaging Inspection */}
                 <Section title="Packaging Inspection" icon={Truck} accent="bg-slate-50 text-slate-700">
+                    {(() => {
+                        const mode = String((formData as any).packagingType || "").toUpperCase()
+                        if (!mode) return null
+                        const label = mode === "PACKED"
+                            ? `Packed${(formData as any).packingType ? ` — ${String((formData as any).packingType).toUpperCase() === "BALE" ? "Bale pack" : "Carton box"}` : ""}`
+                            : "Unpacked"
+                        return (
+                            <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+                                <span className="text-slate-500">Packaging Mode:</span>
+                                <span className="font-semibold text-slate-800">{label}</span>
+                                {mode === "UNPACKED" && <span className="text-xs italic text-slate-400">— carton/retail packaging, measurement &amp; functional tests not applicable</span>}
+                            </div>
+                        )
+                    })()}
                     {packagingItems.length > 0 ? (
                         <div className="mb-6 overflow-x-auto">
                             <table className="w-full text-sm text-left border-collapse">

@@ -161,6 +161,70 @@ async function sendVendorOrderAssignedEmail({ to, companyName, ownerName, orderI
   });
 }
 
+const _titleCase = (v) => (v ? String(v).charAt(0).toUpperCase() + String(v).slice(1).toLowerCase() : '—');
+
+/**
+ * Notify a vendor that a QC checker has been assigned for a FACTORY inspection.
+ * Sent immediately on assignment. Fire-and-forget — never blocks the response.
+ */
+async function sendFactoryInspectionAssignedEmail({
+  to,
+  companyName,
+  ownerName,
+  checkerName,
+  scheduledDate,
+  scheduledTime,
+  priority,
+  estimatedDuration,
+}) {
+  if (!to) return { success: false, skipped: 'no recipient' };
+  return sendTemplatedEmail({
+    key: 'factory_inspection_assigned',
+    to,
+    data: {
+      ownerName: ownerName || companyName || 'Vendor',
+      companyName: companyName || 'your company',
+      checkerName: checkerName || '—',
+      scheduledDate: scheduledDate || '—',
+      scheduledTime: scheduledTime || '—',
+      priorityDisplay: _titleCase(priority),
+      estimatedDuration: estimatedDuration || '—',
+    },
+  });
+}
+
+/**
+ * Notify a vendor that a QC checker has been assigned for a PRODUCT inspection.
+ * Sent immediately on assignment. Fire-and-forget — never blocks the response.
+ */
+async function sendProductInspectionAssignedEmail({
+  to,
+  companyName,
+  ownerName,
+  productName,
+  checkerName,
+  scheduledDate,
+  scheduledTime,
+  priority,
+  estimatedDuration,
+}) {
+  if (!to) return { success: false, skipped: 'no recipient' };
+  return sendTemplatedEmail({
+    key: 'product_inspection_assigned',
+    to,
+    data: {
+      ownerName: ownerName || companyName || 'Vendor',
+      companyName: companyName || 'your company',
+      productName: productName || 'your product',
+      checkerName: checkerName || '—',
+      scheduledDate: scheduledDate || '—',
+      scheduledTime: scheduledTime || '—',
+      priorityDisplay: _titleCase(priority),
+      estimatedDuration: estimatedDuration || '—',
+    },
+  });
+}
+
 /**
  * Generate a secure random password
  */
@@ -180,5 +244,7 @@ module.exports = {
   sendNewVendorRegistrationEmailToAdmins,
   sendLowStockAlertEmail,
   sendVendorOrderAssignedEmail,
+  sendFactoryInspectionAssignedEmail,
+  sendProductInspectionAssignedEmail,
   generateSecurePassword
 };

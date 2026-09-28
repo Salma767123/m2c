@@ -460,12 +460,16 @@ model Vendor {
   /// Coordinates of the WAREHOUSE address.
   warehouseLatitude  Float?
   warehouseLongitude Float?
-  /// Where this vendor's PRODUCTS are physically handled/stored — the site a QC
-  /// PRODUCT inspection is geofenced against. 'FACTORY' = Legal Address & Factory Site
-  /// (factoryLatitude/Longitude), 'WAREHOUSE' = warehouse (warehouseLatitude/Longitude).
-  /// Chosen by the vendor at registration; defaults to FACTORY (also used when the
-  /// warehouse address is the same as the legal/factory address, so the point is shared).
-  productInspectionSite String? @default("FACTORY")
+  /// Where this vendor's PRODUCTS are physically handled/stored — the site(s) a QC
+  /// PRODUCT inspection is geofenced against. Values: 'FACTORY' = Legal Address &
+  /// Factory Site (factoryLatitude/Longitude), 'WAREHOUSE' = warehouse
+  /// (warehouseLatitude/Longitude). The vendor may pick BOTH — a product inspection
+  /// then passes when the checker is within range of EITHER site.
+  ///   • productInspectionSites — the authoritative multi-select array.
+  ///   • productInspectionSite  — legacy single value kept in sync (= first of the
+  ///     array) so older read paths keep working; new logic reads the array.
+  productInspectionSites String[] @default(["FACTORY"])
+  productInspectionSite  String?  @default("FACTORY")
 
   // Vendor Type & Products
   vendorType        VendorType
@@ -618,6 +622,9 @@ model VendorBankDetails {
   iban              String?
   accountType       String? // Savings, Current, etc. Nullable — FE doesn't collect this.
   accountHolderName String? // Nullable — FE doesn't collect this on Step 7 yet.
+  // The legal entity that owns the account — defaults to the vendor's registered
+  // company name. Vendors see it read-only; admins may edit it.
+  legalEntity       String?
   branchName        String?
   branchAddress     String?
 
@@ -625,6 +632,18 @@ model VendorBankDetails {
   isVerified Boolean   @default(false)
   verifiedAt DateTime?
   verifiedBy String? // Admin ID who verified
+
+  // Manual penny-drop verification handshake before final approval:
+  //   PENDING       — submitted, awaiting admin to send the test amount
+  //   AMOUNT_SENT    — admin sent a test amount, awaiting vendor confirmation
+  //   RECEIVED       — vendor confirmed receipt, awaiting admin final approval
+  //   NOT_RECEIVED   — vendor reported not received, admin must resend
+  //   VERIFIED       — admin finally approved (isVerified = true)
+  verificationStatus String    @default("PENDING")
+  amountSentAt       DateTime? // when the admin last sent a test amount
+  vendorRespondedAt  DateTime? // when the vendor last responded (received / not)
+  verificationNote   String?   // admin's note when sending (e.g. amount + UTR ref)
+  vendorNote         String?   // vendor's note with their response (e.g. why not received)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -864,6 +883,11 @@ model Product {
   // delivery). When false, the return option is hidden for this product on the
   // storefront. Defaults to true so existing products stay returnable.
   returnable Boolean @default(true)
+
+  // How the product ships. `packagingType` = 'PACKED' | 'UNPACKED'. When PACKED,
+  // `packingType` = 'BALE' | 'CARTON' (the pack style); it stays null for UNPACKED.
+  packagingType String? // 'PACKED' | 'UNPACKED'
+  packingType   String? // 'BALE' | 'CARTON' — only when packagingType = 'PACKED'
 
   // Single Unit Pricing Configuration
   singleUnitSize     String?
@@ -2302,7 +2326,8 @@ model QCChecker {
   phone     String
 
   // Address
-  address String?
+  address      String?
+  addressLine2 String?
   city    String?
   state   String?
   zipCode String?
@@ -2323,7 +2348,9 @@ model QCChecker {
   joiningDate    DateTime @default(now())
   specialization String?
   experience     Int?     @default(0) // Years of experience
-  certifications String?
+  // Structured certifications: array of { name, documentUrl }. Legacy rows may
+  // still hold a plain string (kept readable since this is a flexible Json field).
+  certifications Json?
 
   // Assigned Hub
   assignedHubId String? @db.ObjectId

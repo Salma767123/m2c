@@ -107,8 +107,12 @@ interface VendorFormData {
   warehouseCountry: string;
   warehouseLatitude: string;
   warehouseLongitude: string;
-  /** Site a QC product inspection is geofenced against: FACTORY (legal/factory) or WAREHOUSE. */
+  /** Site a QC product inspection is geofenced against: FACTORY (legal/factory) or WAREHOUSE.
+   *  Legacy single value — kept in sync with the first element of `productInspectionSites`. */
   productInspectionSite: string;
+  /** Where products are handled — multi-select (FACTORY, WAREHOUSE, or both). The embedded
+   *  WarehouseDetails step drives this array and mirrors element[0] into the single field. */
+  productInspectionSites: string[];
   // Slot-keyed Record in edit mode (`{ nameBoard: {file,url,name}, ... }`)
   // mirroring WarehouseDetails state. Pre-fill defaults to empty `{}`; the
   // component's normaliseFactoryImages also tolerates the legacy array shape
@@ -302,6 +306,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     warehouseLatitude: "",
     warehouseLongitude: "",
     productInspectionSite: "",
+    productInspectionSites: [],
     factoryImages: {},
     factorySiteImages: {},
     factorySiteCapacity: "",
@@ -745,6 +750,12 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         warehouseLatitude: vendor.warehouseLatitude != null ? String(vendor.warehouseLatitude) : "",
         warehouseLongitude: vendor.warehouseLongitude != null ? String(vendor.warehouseLongitude) : "",
         productInspectionSite: vendor.productInspectionSite || "FACTORY",
+        // Multi-select: load the array; fall back to the legacy single value so
+        // older records still show a selection and re-saving keeps all sites.
+        productInspectionSites:
+          Array.isArray(vendor.productInspectionSites) && vendor.productInspectionSites.length
+            ? vendor.productInspectionSites
+            : (vendor.productInspectionSite ? [vendor.productInspectionSite] : []),
         // Same slot-keyed Record feeds both steps: WarehouseDetails reads
         // `factoryImages`, CompanyDetails reads `factorySiteImages`. Seeding
         // only one of them left the Company Details photo slots empty in edit

@@ -285,9 +285,13 @@ const upsertVendorBankDetails = async (req, res) => {
       where: { vendorId }
     });
 
-    if (existingBankDetails && existingBankDetails.isVerified) {
+    // Once submitted, a vendor can no longer change their own bank details — any
+    // change must go through the admin, so the verification handshake can't be
+    // undermined by editing the account after a test amount is sent. (Vendors
+    // add their details exactly once; the admin edits thereafter.)
+    if (existingBankDetails) {
       return res.status(400).json({
-        error: 'Bank details are already verified and cannot be changed. Please contact admin for modifications.'
+        error: 'Your bank details have already been submitted and can no longer be edited here. Please contact admin support for any changes.'
       });
     }
 
@@ -326,8 +330,14 @@ const upsertVendorBankDetails = async (req, res) => {
         ifscCode: ifscCode.toUpperCase(),
         accountType,
         accountHolderName,
+        // Vendors can't edit the legal entity — it's always their company name.
+        legalEntity: vendor.companyName || null,
         branchName,
         branchAddress,
+        // Editing the details restarts the verification handshake from scratch.
+        verificationStatus: 'PENDING',
+        amountSentAt: null,
+        vendorRespondedAt: null,
         updatedAt: new Date()
       },
       create: {
@@ -337,6 +347,7 @@ const upsertVendorBankDetails = async (req, res) => {
         ifscCode: ifscCode.toUpperCase(),
         accountType,
         accountHolderName,
+        legalEntity: vendor.companyName || null,
         branchName,
         branchAddress
       }
@@ -353,6 +364,61 @@ const upsertVendorBankDetails = async (req, res) => {
 
   } catch (error) {
     console.error('Upsert vendor bank details error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// PUT /api/vendor-settings/bank-details/verification-response
+// The vendor confirms whether they received the admin's test amount.
+const respondBankVerification = async (req, res) => {
+  try {
+    const vendorId = req.user.vendorId || req.user.id;
+    const { received, note } = req.body || {};
+
+    if (typeof received !== 'boolean') {
+      return res.status(400).json({ error: 'Please indicate whether you received the amount.' });
+    }
+
+    const bankDetails = await prisma.vendorBankDetails.findUnique({ where: { vendorId } });
+    if (!bankDetails) {
+      return res.status(404).json({ error: 'Bank details not found' });
+    }
+    if (bankDetails.verificationStatus !== 'AMOUNT_SENT') {
+      return res.status(400).json({ error: 'There is no pending verification amount to confirm.' });
+    }
+
+    const cleanNote = note ? String(note).trim().slice(0, 500) : null;
+    const updated = await prisma.vendorBankDetails.update({
+      where: { vendorId },
+      data: {
+        verificationStatus: received ? 'RECEIVED' : 'NOT_RECEIVED',
+        vendorRespondedAt: new Date(),
+        vendorNote: cleanNote,
+      },
+    });
+
+    // Notify admins of the vendor's response.
+    const vendor = await prisma.vendor.findUnique({ where: { id: vendorId }, select: { companyName: true } });
+    const { createNotificationForRole } = require('./notificationController');
+    createNotificationForRole({
+      role: 'ADMIN',
+      type: received ? 'BANK_VERIFICATION_RECEIVED' : 'BANK_VERIFICATION_NOT_RECEIVED',
+      title: received ? 'Vendor confirmed verification amount' : 'Vendor did not receive verification amount',
+      message: received
+        ? `${vendor?.companyName || 'A vendor'} confirmed receiving the verification amount. You can now approve their bank details.`
+        : `${vendor?.companyName || 'A vendor'} reported they have NOT received the verification amount. Please recheck and resend.${cleanNote ? ` Note: ${cleanNote}` : ''}`,
+      data: { vendorId, bankDetailsId: bankDetails.id },
+    }).catch(() => {});
+
+    res.json({
+      message: received ? 'Thanks — we\'ll finalise your verification shortly.' : 'Noted — the admin will resend the amount.',
+      bankDetails: {
+        ...updated,
+        accountNumber: updated.accountNumber.replace(/\d(?=\d{4})/g, '*'),
+      },
+    });
+  } catch (error) {
+    console.error('Respond bank verification error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -786,7 +852,8 @@ module.exports = {
   // Bank Details
   getVendorBankDetails,
   upsertVendorBankDetails,
-  
+  respondBankVerification,
+
   // Document Management
   getVendorDocuments,
   uploadVendorDocument,

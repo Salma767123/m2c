@@ -569,11 +569,14 @@ export default function VendorDataSummary({
         <div className="flex flex-col">
           <InfoRow
             label="Where are your products handled / stored?"
-            value={
-              data.productInspectionSite === 'WAREHOUSE' ? 'Warehouse address'
-                : data.productInspectionSite === 'FACTORY' ? 'Legal / Factory address'
-                  : 'Not provided'
-            }
+            value={(() => {
+              const sites: string[] = Array.isArray(data.productInspectionSites) && data.productInspectionSites.length > 0
+                ? data.productInspectionSites
+                : (data.productInspectionSite ? [data.productInspectionSite] : []);
+              if (sites.length === 0) return 'Not provided';
+              const label = (s: string) => s === 'WAREHOUSE' ? 'Warehouse address' : 'Legal / Factory address';
+              return sites.map(label).join(' & ');
+            })()}
           />
           {data.sameAsWarehouse ? (
             /* Linked to Company Details — repeating the mirrored address /

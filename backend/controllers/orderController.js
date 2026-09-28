@@ -1602,6 +1602,140 @@ const validateCheckout = async (req, res) => {
     }
 };
 
+// Customer "Buy Again": add every still-available item from a past order back
+// into the caller's cart. Missing / out-of-region / out-of-stock items are
+// skipped and reported; quantities are capped at current available stock and
+// prices are refreshed to the live storefront price (never the old order price).
+const reorderToCart = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { id } = req.params;
+        const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+
+        const order = await prisma.order.findUnique({
+            where: isObjectId ? { id } : { orderId: id },
+            include: { items: true },
+        });
+
+        if (!order) {
+            return res.status(404).json({ success: false, error: 'Order not found' });
+        }
+        if (order.customerId !== userId) {
+            return res.status(403).json({ success: false, error: 'Unauthorized' });
+        }
+        if (!Array.isArray(order.items) || order.items.length === 0) {
+            return res.status(400).json({ success: false, error: 'This order has no items to reorder' });
+        }
+
+        // Cart line currency follows the caller's current storefront region, falling
+        // back to the currency the order was originally charged in.
+        const currency = (req.body?.currency || req.query?.currency || order.currency || 'INR') === 'USD' ? 'USD' : 'INR';
+
+        // Get or create the caller's cart once, then upsert each item into it.
+        let cart = await prisma.cart.findFirst({ where: { userId } });
+        if (!cart) cart = await prisma.cart.create({ data: { userId } });
+
+        const added = [];
+        const skipped = [];
+
+        for (const item of order.items) {
+            const desiredQty = Math.max(1, item.quantity || 1);
+            const product = await prisma.product.findUnique({
+                where: { id: item.productId },
+                select: {
+                    id: true, name: true, inStock: true, totalStock: true,
+                    basePrice: true, adminFixedPrice: true, priceINR: true, priceUSD: true, priceVisibility: true,
+                    variants: item.variantId ? {
+                        where: { id: item.variantId },
+                        select: { id: true, price: true, adminFixedPrice: true, priceINR: true, priceUSD: true, stock: true, priceVisibility: true },
+                    } : false,
+                },
+            });
+
+            const label = item.productName || product?.name || 'Item';
+
+            if (!product) {
+                skipped.push({ name: label, reason: 'No longer available' });
+                continue;
+            }
+            const variant = item.variantId ? (product.variants && product.variants[0]) : null;
+            if (item.variantId && !variant) {
+                skipped.push({ name: label, reason: 'Selected variant no longer available' });
+                continue;
+            }
+
+            // Region gate — the SKU must be visible in the caller's storefront.
+            const skuVisibility = variant ? variant.priceVisibility : product.priceVisibility;
+            if (!isVisibleInRegion(skuVisibility, currency)) {
+                skipped.push({ name: label, reason: 'Not available in your region' });
+                continue;
+            }
+
+            const availableStock = variant ? variant.stock : product.totalStock;
+            if (!product.inStock || !availableStock || availableStock < 1) {
+                skipped.push({ name: label, reason: 'Out of stock' });
+                continue;
+            }
+
+            // Cap the re-added quantity at what is currently in stock.
+            const qty = Math.min(desiredQty, availableStock);
+
+            // Resolve the CURRENT price in the caller's currency (never the stale order price).
+            let price;
+            if (variant) {
+                price = currency === 'USD'
+                    ? (variant.priceUSD || variant.adminFixedPrice || variant.price)
+                    : (variant.priceINR || variant.adminFixedPrice || variant.price);
+            } else {
+                price = currency === 'USD'
+                    ? (product.priceUSD || product.adminFixedPrice || product.basePrice)
+                    : (product.priceINR || product.adminFixedPrice || product.basePrice);
+            }
+
+            const existing = await prisma.cartItem.findFirst({
+                where: { cartId: cart.id, productId: product.id, variantId: item.variantId || null },
+            });
+
+            if (existing) {
+                // Merge with any existing cart line, never exceeding available stock.
+                const mergedQty = Math.min(existing.quantity + qty, availableStock);
+                await prisma.cartItem.update({
+                    where: { id: existing.id },
+                    data: { quantity: mergedQty, price, currency },
+                });
+            } else {
+                await prisma.cartItem.create({
+                    data: { cartId: cart.id, productId: product.id, variantId: item.variantId || null, quantity: qty, price, currency },
+                });
+            }
+
+            added.push({ name: label, quantity: qty, capped: qty < desiredQty });
+        }
+
+        const updatedCart = await prisma.cart.findUnique({
+            where: { id: cart.id },
+            include: { items: true },
+        });
+
+        return res.json({
+            success: true,
+            message: added.length
+                ? `${added.length} item${added.length > 1 ? 's' : ''} added to your cart`
+                : 'No items could be added to your cart',
+            data: {
+                added,
+                skipped,
+                addedCount: added.length,
+                skippedCount: skipped.length,
+                itemCount: updatedCart?.items?.length || 0,
+            },
+        });
+    } catch (error) {
+        console.error('Reorder to cart error:', error);
+        return res.status(500).json({ success: false, error: 'Failed to add items to cart' });
+    }
+};
+
 module.exports = {
     createOrder,
     validateCheckout,
@@ -1609,4 +1743,5 @@ module.exports = {
     getOrderById,
     cancelMyOrder,
     requestReturn,
+    reorderToCart,
 };

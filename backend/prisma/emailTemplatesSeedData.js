@@ -461,3 +461,43 @@ module.exports.push({
   buttonLabel: _courierDefaults.buttonLabel,
   footerText: _courierDefaults.footerText,
 });
+
+const _factoryInspDefaults = getEditableDefaults('factory_inspection_assigned');
+module.exports.push({
+  key: 'factory_inspection_assigned',
+  category: 'NOTIFICATIONS',
+  name: 'Factory Inspection Assigned (Vendor)',
+  description: "Sent to a vendor immediately when a QC checker is assigned for a factory inspection. Includes the assigned checker and the scheduled date, time, priority and duration.",
+  subject: '🏭 Factory Inspection Assigned for {{companyName}} on {{scheduledDate}}',
+  bodyHtml: buildBodyHtml('factory_inspection_assigned', {}),
+  fromName: 'QC Team',
+  variables: ['ownerName', 'companyName', 'checkerName', 'scheduledDate', 'scheduledTime', 'priorityDisplay', 'estimatedDuration'],
+  isSecurity: false,
+  sortOrder: 13,
+  emoji: _factoryInspDefaults.emoji,
+  headerTitle: _factoryInspDefaults.headerTitle,
+  headerSubtitle: _factoryInspDefaults.headerSubtitle,
+  bodyText: _factoryInspDefaults.bodyText,
+  buttonLabel: _factoryInspDefaults.buttonLabel,
+  footerText: _factoryInspDefaults.footerText,
+});
+
+const _productInspDefaults = getEditableDefaults('product_inspection_assigned');
+module.exports.push({
+  key: 'product_inspection_assigned',
+  category: 'NOTIFICATIONS',
+  name: 'Product Inspection Assigned (Vendor)',
+  description: "Sent to a vendor immediately when a QC checker is assigned to inspect one of their products. Includes the product name, assigned checker and the scheduled date, time, priority and duration.",
+  subject: '📦 Product Inspection Assigned for "{{productName}}" on {{scheduledDate}}',
+  bodyHtml: buildBodyHtml('product_inspection_assigned', {}),
+  fromName: 'QC Team',
+  variables: ['ownerName', 'companyName', 'productName', 'checkerName', 'scheduledDate', 'scheduledTime', 'priorityDisplay', 'estimatedDuration'],
+  isSecurity: false,
+  sortOrder: 14,
+  emoji: _productInspDefaults.emoji,
+  headerTitle: _productInspDefaults.headerTitle,
+  headerSubtitle: _productInspDefaults.headerSubtitle,
+  bodyText: _productInspDefaults.bodyText,
+  buttonLabel: _productInspDefaults.buttonLabel,
+  footerText: _productInspDefaults.footerText,
+});

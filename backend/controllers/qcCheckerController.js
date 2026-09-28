@@ -5,6 +5,28 @@ const { prisma } = require('../config/database');
 const { sendTemplatedEmail } = require('../utils/emailTemplateRenderer');
 const { resolveBase64InValue } = require('../config/cloudinary');
 
+// Normalise the certifications payload into [{ name, documentUrl }]. Each row's
+// document (base64 or an already-uploaded URL) goes to Cloudinary so only the URL
+// is stored; empty rows are dropped and the list is capped at 5. A legacy plain
+// string is preserved as-is (the field is flexible Json).
+async function resolveCertifications(certs) {
+    if (!Array.isArray(certs)) return certs || null;
+    const out = [];
+    for (const c of certs) {
+        const name = (c?.name || '').toString().trim();
+        if (!name) continue;
+        let documentUrl = null;
+        if (c?.document) {
+            documentUrl = await resolveBase64InValue(c.document, { folder: 'qc-checkers/certifications' });
+        } else if (c?.documentUrl) {
+            documentUrl = c.documentUrl;
+        }
+        out.push({ name, documentUrl });
+        if (out.length >= 5) break;
+    }
+    return out.length ? out : null;
+}
+
 // Generate a random password
 const generateRandomPassword = (length = 10) => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$!';
@@ -59,6 +81,7 @@ const createQCChecker = async (req, res) => {
             email,
             phone,
             address,
+            addressLine2,
             city,
             state,
             zipCode,
@@ -116,6 +139,7 @@ const createQCChecker = async (req, res) => {
                 title: title || null,
                 phone,
                 address: address || null,
+                addressLine2: addressLine2 || null,
                 city: city || null,
                 state: state || null,
                 zipCode: zipCode || null,
@@ -128,7 +152,7 @@ const createQCChecker = async (req, res) => {
                 joiningDate: joiningDate ? new Date(joiningDate) : new Date(),
                 specialization: specialization || null,
                 experience: experience ? parseInt(experience) : 0,
-                certifications: certifications || null,
+                certifications: await resolveCertifications(certifications),
                 assignedHubId: assignedHubId || null,
                 status: status ? status.toUpperCase() : 'ACTIVE',
                 isActive: status ? status.toLowerCase() !== 'inactive' : true,
@@ -201,6 +225,7 @@ const getAllQCCheckers = async (req, res) => {
                     // Small Cloudinary URL — shown as the avatar in the management list.
                     profilePhoto: true,
                     address: true,
+                    addressLine2: true,
                     city: true,
                     state: true,
                     zipCode: true,
@@ -288,6 +313,7 @@ const getQCCheckerById = async (req, res) => {
                 title: true,
                 phone: true,
                 address: true,
+                addressLine2: true,
                 city: true,
                 state: true,
                 zipCode: true,
@@ -402,6 +428,7 @@ const updateQCChecker = async (req, res) => {
             title,
             phone,
             address,
+            addressLine2,
             city,
             state,
             zipCode,
@@ -432,6 +459,7 @@ const updateQCChecker = async (req, res) => {
         if (title !== undefined) updateData.title = title || null;
         if (phone) updateData.phone = phone;
         if (address !== undefined) updateData.address = address || null;
+        if (addressLine2 !== undefined) updateData.addressLine2 = addressLine2 || null;
         if (city !== undefined) updateData.city = city || null;
         if (state !== undefined) updateData.state = state || null;
         if (zipCode !== undefined) updateData.zipCode = zipCode || null;
@@ -449,7 +477,7 @@ const updateQCChecker = async (req, res) => {
         }
         if (specialization !== undefined) updateData.specialization = specialization || null;
         if (experience !== undefined) updateData.experience = experience ? parseInt(experience) : 0;
-        if (certifications !== undefined) updateData.certifications = certifications || null;
+        if (certifications !== undefined) updateData.certifications = await resolveCertifications(certifications);
         if (assignedHubId !== undefined) updateData.assignedHubId = assignedHubId || null;
 
         const updated = await prisma.qCChecker.update({
@@ -463,6 +491,7 @@ const updateQCChecker = async (req, res) => {
                 title: true,
                 phone: true,
                 address: true,
+                addressLine2: true,
                 city: true,
                 state: true,
                 zipCode: true,
@@ -682,6 +711,7 @@ const getCheckerProfile = async (req, res) => {
                 title: true,
                 phone: true,
                 address: true,
+                addressLine2: true,
                 city: true,
                 state: true,
                 zipCode: true,
@@ -809,6 +839,7 @@ const updateCheckerProfile = async (req, res) => {
         if (name) updateData.name = name;
         if (phone) updateData.phone = phone;
         if (address !== undefined) updateData.address = address || null;
+        if (addressLine2 !== undefined) updateData.addressLine2 = addressLine2 || null;
         if (city !== undefined) updateData.city = city || null;
         if (state !== undefined) updateData.state = state || null;
         if (zipCode !== undefined) updateData.zipCode = zipCode || null;
@@ -833,6 +864,7 @@ const updateCheckerProfile = async (req, res) => {
                 name: true,
                 phone: true,
                 address: true,
+                addressLine2: true,
                 city: true,
                 state: true,
                 zipCode: true,
@@ -1933,6 +1965,7 @@ const startProductInspectionByQc = async (req, res) => {
                         warehouseLatitude: true,
                         warehouseLongitude: true,
                         productInspectionSite: true,
+                        productInspectionSites: true,
                         mapLink: true,
                         companyName: true,
                     },
@@ -1954,6 +1987,7 @@ const startProductInspectionByQc = async (req, res) => {
         const { verifyCheckerAtVendor, LOCATION_THRESHOLD_METERS } = require('../utils/locationUtils');
         const geo = await verifyCheckerAtVendor({
             vendor: product.vendor,
+            sites: product.vendor?.productInspectionSites,
             site: product.vendor?.productInspectionSite,
             checkerLatitude,
             checkerLongitude,
@@ -2010,6 +2044,7 @@ const approveProductByQc = async (req, res) => {
                         warehouseLatitude: true,
                         warehouseLongitude: true,
                         productInspectionSite: true,
+                        productInspectionSites: true,
                         mapLink: true,
                         companyName: true,
                     },
@@ -2040,6 +2075,7 @@ const approveProductByQc = async (req, res) => {
         const { verifyCheckerAtVendor, buildLocationStamp, buildLocationSnapshot } = require('../utils/locationUtils');
         const geo = await verifyCheckerAtVendor({
             vendor: product.vendor,
+            sites: product.vendor?.productInspectionSites,
             site: product.vendor?.productInspectionSite,
             checkerLatitude,
             checkerLongitude,
@@ -2163,6 +2199,7 @@ const rejectProductByQc = async (req, res) => {
                         warehouseLatitude: true,
                         warehouseLongitude: true,
                         productInspectionSite: true,
+                        productInspectionSites: true,
                         mapLink: true,
                         companyName: true,
                     },
@@ -2193,6 +2230,7 @@ const rejectProductByQc = async (req, res) => {
         const { verifyCheckerAtVendor, buildLocationStamp, buildLocationSnapshot } = require('../utils/locationUtils');
         const geo = await verifyCheckerAtVendor({
             vendor: product.vendor,
+            sites: product.vendor?.productInspectionSites,
             site: product.vendor?.productInspectionSite,
             checkerLatitude,
             checkerLongitude,

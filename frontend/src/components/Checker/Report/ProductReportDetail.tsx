@@ -439,6 +439,20 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
 
       {/* Section 3: Packaging */}
       <Section title="Section 3 — Packaging Inspection" icon={Box} accent="bg-teal-50 text-teal-800">
+        {(() => {
+          const mode = String((fd as any).packagingType || "").toUpperCase()
+          if (!mode) return null
+          const label = mode === "PACKED"
+            ? `Packed${(fd as any).packingType ? ` — ${String((fd as any).packingType).toUpperCase() === "BALE" ? "Bale pack" : "Carton box"}` : ""}`
+            : "Unpacked"
+          return (
+            <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-slate-500">Packaging Mode:</span>
+              <span className="font-semibold text-slate-800">{label}</span>
+              {mode === "UNPACKED" && <span className="text-xs italic text-slate-400">— carton/retail packaging, measurement &amp; functional tests not applicable</span>}
+            </div>
+          )
+        })()}
         {packagingItems.length > 0 ? (
           <div className="overflow-x-auto mb-4">
             <table className="w-full text-sm text-left border-collapse">

@@ -17,6 +17,7 @@ const {
   testVendorEmail,
   assignQc,
   verifyVendorBankDetails,
+  sendBankVerificationAmount,
   upsertVendorBankDetailsByAdmin
 } = require('../controllers/vendorController');
 const { authenticateToken, requireRole, requirePermission } = require('../middleware/auth');
@@ -48,6 +49,7 @@ router.put('/:vendorId/suspend', authenticateToken, requireRole('admin'), requir
 // Admin create/update of a vendor's bank details (vendor portal parity)
 router.put('/:vendorId/bank-details', authenticateToken, requireRole('admin'), requirePermission('vendor_management:edit'), upsertVendorBankDetailsByAdmin);
 router.put('/:vendorId/verify-bank', authenticateToken, requireRole('admin'), requirePermission('vendor_management:edit'), verifyVendorBankDetails);
+router.put('/:vendorId/bank-verification/send', authenticateToken, requireRole('admin'), requirePermission('vendor_management:edit'), sendBankVerificationAmount);
 router.post('/assign-qc', authenticateToken, requireRole('admin'), requirePermission(['assign_qc_checker:create', 'assign_qc_checker:edit']), assignQc);
 
 // Test email endpoint (development only)

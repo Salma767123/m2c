@@ -12,6 +12,8 @@ export interface AdminProduct {
   gstPercentage?: number;
   hsnCode?: string;
   returnable?: boolean; // Whether customers can return this product
+  packagingType?: 'PACKED' | 'UNPACKED'; // How the product ships
+  packingType?: 'BALE' | 'CARTON'; // Pack style when packed
   adminFixedPrice?: number; // Admin's fixed price (separate from basePrice)
   singleUnitSize?: string;
   singleUnitColor?: string;
@@ -238,7 +240,9 @@ class AdminProductService {
      * to publish a product sitting on one without a decision — 'approve' adds it
      * to the live taxonomy, 'merge' folds it into `categoryMergeTargetId`.
      */
-    categoryResolution?: { action: 'approve' | 'merge'; targetCategoryId?: string }
+    categoryResolution?: { action: 'approve' | 'merge'; targetCategoryId?: string },
+    /** Return eligibility finalised at approval — governs the customer's return option. */
+    returnable?: boolean
   ): Promise<{ success: boolean; data?: AdminProduct; message?: string; code?: string }> {
     try {
       const payload: any = {};
@@ -275,6 +279,9 @@ class AdminProductService {
         if (multiCurrency.variantOriginalPricesINR) payload.variantOriginalPricesINR = multiCurrency.variantOriginalPricesINR;
         if (multiCurrency.variantOriginalPricesUSD) payload.variantOriginalPricesUSD = multiCurrency.variantOriginalPricesUSD;
         if (multiCurrency.variantVisibilities) payload.variantVisibilities = multiCurrency.variantVisibilities;
+      }
+      if (returnable !== undefined) {
+        payload.returnable = returnable;
       }
       const response = await axios.put(`/products/${id}/approve`, payload);
       return response.data;

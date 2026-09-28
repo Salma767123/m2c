@@ -3,6 +3,7 @@
 // OrderDetail component for displaying individual order information
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { FaceIcon } from '@/components/WebSite/Shared/FaceRating';
 import {
@@ -22,6 +23,8 @@ import {
   Clock,
   ExternalLink,
   RotateCcw,
+  ShoppingCart,
+  RefreshCw,
   BadgePercent,
   ClipboardCheck
 } from "lucide-react"
@@ -138,6 +141,8 @@ const RETURN_REASONS = [
 ]
 
 export default function OrderDetail({ orderId }: OrderDetailProps) {
+  const router = useRouter()
+  const [buyingAgain, setBuyingAgain] = useState(false)
   const [quantities, setQuantities] = useState<{ [key: number]: number }>({})
   const [orderDetails, setOrderDetails] = useState<APIOrder | null>(null)
   const [loading, setLoading] = useState(true)
@@ -178,6 +183,31 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
       showErrorToast('Failed', e?.message || 'Please try again.')
     } finally {
       setActionSubmitting(false)
+    }
+  }
+
+  // "Buy Again": re-add this order's still-available items to the cart, then go
+  // to the cart. Unavailable / out-of-stock lines are reported, not dropped silently.
+  const handleBuyAgain = async () => {
+    if (!orderDetails || buyingAgain) return
+    try {
+      setBuyingAgain(true)
+      const res = await orderService.reorder(orderDetails.id)
+      const { addedCount = 0, skippedCount = 0, skipped = [], itemCount = 0 } = res.data || ({} as any)
+      if (addedCount > 0) {
+        const reasons = skipped.map((s) => s.reason).filter((v, i, a) => a.indexOf(v) === i).join(', ')
+        const skipNote = skippedCount > 0 ? ` ${skippedCount} item${skippedCount > 1 ? 's' : ''} couldn't be added (${reasons}).` : ''
+        showSuccessToast('Added to Cart', `${res.message}.${skipNote}`)
+        try { window.dispatchEvent(new CustomEvent('cart-changed', { detail: { count: itemCount } })) } catch {}
+        router.push('/cart')
+      } else {
+        const reasons = skipped.map((s) => s.reason).filter((v, i, a) => a.indexOf(v) === i).join(', ')
+        showErrorToast('Nothing added', skippedCount > 0 ? `These items are currently unavailable (${reasons}).` : 'No items from this order could be added to your cart.')
+      }
+    } catch (e: any) {
+      showErrorToast('Failed', e?.message || 'Could not add items to your cart. Please try again.')
+    } finally {
+      setBuyingAgain(false)
     }
   }
 
@@ -493,6 +523,15 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
               {/* Customer actions — request return post-delivery. Order
                   cancellation is not offered to customers at any pre-delivery stage. */}
               <div className="flex flex-wrap items-center gap-2">
+                {/* Buy Again — re-add this order's items to the cart. */}
+                <button
+                  onClick={handleBuyAgain}
+                  disabled={buyingAgain}
+                  className="inline-flex items-center gap-2 rounded-full border border-[#e01a1b] px-4 py-2 text-sm font-medium text-[#e01a1b] transition-colors hover:bg-[#e01a1b] hover:text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {buyingAgain ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShoppingCart className="w-4 h-4" />}
+                  {buyingAgain ? 'Adding…' : 'Buy Again'}
+                </button>
                 {orderDetails.status === 'DELIVERED'
                   && orderDetails.currency !== 'USD'
                   && orderDetails.items.some((it) => it.returnable !== false)

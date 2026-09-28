@@ -213,10 +213,13 @@ async function verifyCheckerAtVendor({
   prisma,
   label,
   inspectionType,
-  // Restrict the geofence to ONE registered address. Product inspections pass the
-  // vendor's chosen product-handling site ('FACTORY' | 'WAREHOUSE'); factory/vendor
-  // inspections leave it undefined and are checked against BOTH addresses (OR).
+  // Restrict the geofence to the vendor's chosen product-handling site(s). Product
+  // inspections pass `sites` (an array of 'FACTORY' | 'WAREHOUSE') — or the legacy
+  // `site` (a single value) — and the checker passes within range of ANY of them.
+  // Factory/vendor inspections leave both undefined and are checked against BOTH
+  // addresses (OR).
   site,
+  sites,
 }) {
   const prefix = label ? `${label} — ` : "";
 
@@ -284,12 +287,17 @@ async function verifyCheckerAtVendor({
     candidates.push({ label: "warehouse", lat: vendor.warehouseLatitude, lng: vendor.warehouseLongitude });
   }
 
-  // Product inspection: restrict to the vendor's chosen product-handling site. If that
-  // site has coordinates, measure ONLY against it; if it has none, keep all candidates
-  // as a fallback so a mis-configured vendor doesn't wrongly block the checker.
-  if (site) {
-    const wanted = String(site).toUpperCase() === "WAREHOUSE" ? "warehouse" : "legal/factory";
-    const restricted = candidates.filter((c) => c.label === wanted);
+  // Product inspection: restrict to the vendor's chosen product-handling site(s).
+  // Normalize `sites` (array) / `site` (legacy single) into the internal candidate
+  // labels; the checker may stand at ANY selected site. If none of the selected sites
+  // have coordinates, keep all candidates as a fallback so a mis-configured vendor
+  // doesn't wrongly block the checker.
+  const rawSites = Array.isArray(sites) && sites.length > 0 ? sites : (site ? [site] : []);
+  if (rawSites.length > 0) {
+    const wantedLabels = new Set(
+      rawSites.map((s) => (String(s).toUpperCase() === "WAREHOUSE" ? "warehouse" : "legal/factory")),
+    );
+    const restricted = candidates.filter((c) => wantedLabels.has(c.label));
     if (restricted.length > 0) candidates = restricted;
   }
 

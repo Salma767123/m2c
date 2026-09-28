@@ -17,6 +17,11 @@ import {
     makeDefaultPackagingItems,
     makeDefaultTestGroups,
     makeDefaultAdditionalEvidence,
+    isProductUnpacked,
+    packingTypeToToggle,
+    packagingItemsForMode,
+    testGroupsForMode,
+    PACKED_ONLY_TEST_GROUP_IDS,
 } from "@/components/Checker/Vendor/Steps/PI_data"
 
 // ── Services + utilities ──────────────────────────────────────────────────────
@@ -110,6 +115,11 @@ function makeDefaultFormData(productName: string, vendorName: string) {
         serviceType: "Pre-Shipment Inspection",
         vendorData: null as any,
         productData: null as any,
+        // Packaging mode, snapshotted from the product so reports can state it even
+        // after the fact. 'PACKED' | 'UNPACKED' and, when packed, 'BALE' | 'CARTON'.
+        // Drives which packaging/testing sections apply (see the autofill effect).
+        packagingType: "" as string,
+        packingType: "" as string,
 
         // Step 2
         productVerifications: {} as Record<string, { ok: boolean | null; remarks: string }>,
@@ -294,7 +304,12 @@ export default function ProductInspectionForm({
     // ── Form data ─────────────────────────────────────────────────────────────
     const prefilledRef = useRef<string | null>(null)
 
+    // Whether a saved draft existed at mount — so the packaging-mode seeding only
+    // sets the Carton/Bale toggle on a FRESH inspection, never over a resumed draft
+    // where the checker may have chosen the toggle themselves.
+    const hadDraftRef = useRef(false)
     const [formData, setFormData] = useState(() => {
+        try { hadDraftRef.current = typeof window !== "undefined" && !!window.localStorage.getItem(draftKeyFor(productId)) } catch { /* ignore */ }
         const d = loadDraft(productId, makeDefaultFormData(productName, vendorName))
         // The Inspection Date is always the day the inspection is actually performed
         // — never a stale value carried over by an old or reassigned draft.
@@ -369,14 +384,29 @@ export default function ProductInspectionForm({
                     return
                 }
 
-                setFormData((prev) => ({
-                    ...prev,
-                    vendor: prev.vendor || v.companyName || vendorName,
-                    vendorData: v,
-                    productData: product,
-                    // Overwrite inspectorSignature with the current name from DB (picks up admin edits)
-                    inspectorSignature: product?.assignedQc ? formatCheckerName(product.assignedQc) : prev.inspectorSignature,
-                }))
+                setFormData((prev) => {
+                    // Packaging mode drives which sections apply and the Carton/Bale toggle.
+                    const unpacked = isProductUnpacked(product)
+                    const toggle = packingTypeToToggle(product?.packingType)
+                    // Filtering is idempotent + only removes skipped sections, so it's
+                    // safe on a resumed draft. Toggle seeding runs only on a fresh form.
+                    const packagingItems = packagingItemsForMode(prev.packagingItems, unpacked)
+                    const testGroups = hadDraftRef.current
+                        ? (unpacked ? prev.testGroups.filter((g: any) => !PACKED_ONLY_TEST_GROUP_IDS.has(g.id)) : prev.testGroups)
+                        : testGroupsForMode(prev.testGroups, unpacked, toggle)
+                    return {
+                        ...prev,
+                        vendor: prev.vendor || v.companyName || vendorName,
+                        vendorData: v,
+                        productData: product,
+                        packagingType: product?.packagingType || "",
+                        packingType: product?.packingType || "",
+                        packagingItems,
+                        testGroups,
+                        // Overwrite inspectorSignature with the current name from DB (picks up admin edits)
+                        inspectorSignature: product?.assignedQc ? formatCheckerName(product.assignedQc) : prev.inspectorSignature,
+                    }
+                })
 
                 prefilledRef.current = productId
             })

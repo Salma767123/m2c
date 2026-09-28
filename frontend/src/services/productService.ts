@@ -20,6 +20,8 @@ export interface ProductFormData {
   gstPercentage?: number;
   hsnCode?: string;
   returnable?: boolean; // Whether customers can return this product (within 7 days of delivery)
+  packagingType?: 'PACKED' | 'UNPACKED'; // How the product ships
+  packingType?: 'BALE' | 'CARTON'; // Pack style when packed
   // Vendor payout economics (attached by the backend on vendor-facing responses only).
   // What the vendor is actually paid: GST on their base price, and the per-unit total.
   vendorGstRate?: number;

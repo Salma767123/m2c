@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   ChevronDown,
   ChevronRight,
@@ -430,6 +430,8 @@ function TestGroupCard({
   // Only the measurement & functional groups carry the Carton/Bale packaging toggle.
   const showPackagingToggle = (PACKAGING_TOGGLE_GROUPS as readonly string[]).includes(group.id)
   const packagingType = group.packagingType || 'Carton'
+  // Functional Tests follows Measurement Inspection — its toggle is display-only.
+  const packagingLocked = group.id === 'functionalTests'
   const regularTests = group.tests.filter((t) => !t.isOther)
   const otherTests = group.tests.filter((t) => t.isOther)
   const passed = group.tests.filter((t) => t.pass).length
@@ -478,25 +480,30 @@ function TestGroupCard({
       {showTests && (
         <div className="p-4 space-y-3">
           {showPackagingToggle && (
-            <div className="flex items-center gap-3 pb-1">
+            <div className="flex flex-wrap items-center gap-3 pb-1">
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Packaging Type</span>
-              <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50">
+              <div className={`inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 ${packagingLocked ? 'opacity-90' : ''}`}>
                 {(['Carton', 'Bale'] as const).map((type) => (
                   <button
                     key={type}
                     type="button"
-                    onClick={() => { if (type !== packagingType) onPackagingTypeChange(type) }}
+                    disabled={packagingLocked}
+                    onClick={() => { if (!packagingLocked && type !== packagingType) onPackagingTypeChange(type) }}
                     aria-pressed={type === packagingType}
+                    title={packagingLocked ? 'Follows the Measurement Inspection packaging type' : undefined}
                     className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-colors ${
                       type === packagingType
                         ? 'bg-brand-500 text-white shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
-                    }`}
+                    } ${packagingLocked ? 'cursor-not-allowed' : ''}`}
                   >
                     {type}
                   </button>
                 ))}
               </div>
+              {packagingLocked && (
+                <span className="text-[11px] text-slate-400">Same as Measurement Inspection</span>
+              )}
             </div>
           )}
           {regularTests.map((test) => (
@@ -659,11 +666,18 @@ export default function PI_Step5_Testing({ formData, setFormData, errors = {} }:
   // Carton/Bale toggle for the measurement & functional groups: store the choice and
   // relabel that group's predefined test names accordingly (custom "Other" rows keep
   // whatever the checker typed).
+  //
+  // Measurement Inspection drives Functional Tests: choosing the packaging type on
+  // Measurement applies the SAME type to Functional too (its own toggle is locked),
+  // so the two can never diverge.
   const setPackagingType = (groupId: string, type: 'Carton' | 'Bale') => {
+    const targetIds = groupId === 'measurementInspection'
+      ? ['measurementInspection', 'functionalTests']
+      : [groupId]
     setFormData((prev: any) => ({
       ...prev,
-      testGroups: groups.map((g) =>
-        g.id === groupId
+      testGroups: (prev.testGroups || []).map((g: TestGroup) =>
+        targetIds.includes(g.id)
           ? {
               ...g,
               packagingType: type,
@@ -673,6 +687,17 @@ export default function PI_Step5_Testing({ formData, setFormData, errors = {} }:
       ),
     }))
   }
+
+  // Keep Functional Tests' packaging type locked to Measurement Inspection's, even
+  // for legacy data that was saved with mismatched values.
+  useEffect(() => {
+    const meas = groups.find((g) => g.id === 'measurementInspection')
+    const func = groups.find((g) => g.id === 'functionalTests')
+    if (meas && func && (meas.packagingType || 'Carton') !== (func.packagingType || 'Carton')) {
+      setPackagingType('measurementInspection', meas.packagingType || 'Carton')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groups])
 
   const updateTest = (groupId: string, testId: string, patch: Partial<TestItem>) => {
     setFormData((prev: any) => ({

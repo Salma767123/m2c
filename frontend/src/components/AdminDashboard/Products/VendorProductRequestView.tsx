@@ -743,7 +743,7 @@ export default function VendorProductRequestView({ requestId, context = 'vendor-
                   if (fs.composition) rows.push({ label: 'Composition', value: String(fs.composition) })
                   if (fs.weightValue) rows.push({ label: 'Weight', value: `${fs.weightValue} g`, icon: <Scale className="h-3.5 w-3.5" /> })
                   if (fs.length) rows.push({ label: 'Length', value: `${fs.length} cm`, icon: <Ruler className="h-3.5 w-3.5" /> })
-                  if (fs.breadth) rows.push({ label: 'Breadth', value: `${fs.breadth} cm`, icon: <Ruler className="h-3.5 w-3.5" /> })
+                  if (fs.breadth) rows.push({ label: 'Width', value: `${fs.breadth} cm`, icon: <Ruler className="h-3.5 w-3.5" /> })
                   if (fs.gsm) rows.push({ label: 'GSM', value: `${fs.gsm} GSM`, icon: <Scale className="h-3.5 w-3.5" /> })
                   else if (!fs.weightValue && fs.weight) rows.push({ label: 'Weight', value: `${fs.weight}${fs.weightUnit ? ` ${fs.weightUnit}` : ''}`, icon: <Scale className="h-3.5 w-3.5" /> })
                   if (fs.weave) rows.push({ label: 'Type of Weave', value: String(fs.weave) })

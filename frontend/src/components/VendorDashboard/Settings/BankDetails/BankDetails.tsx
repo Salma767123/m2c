@@ -107,11 +107,33 @@ export default function BankDetails() {
     accountType: 'savings',
   })
 
+  // Registered vendors (any businessType other than "unregistered") must use a
+  // Current Account; only unregistered vendors may choose Savings or Current.
+  const [isUnregistered, setIsUnregistered] = useState(false)
+  // The vendor's legal entity — their registered company name, shown read-only.
+  const [legalEntity, setLegalEntity] = useState('')
+
   // Load bank details on component mount
   useEffect(() => {
     loadBankDetails()
     loadDocuments()
+    loadVendorType()
   }, [])
+
+  const loadVendorType = async () => {
+    try {
+      const { vendor } = await VendorService.getVendorProfile()
+      const unregistered = String(vendor?.businessType || '').toLowerCase() === 'unregistered'
+      setIsUnregistered(unregistered)
+      setLegalEntity(vendor?.companyName || '')
+      // Registered vendor → force Current Account (only when no saved value yet).
+      if (!unregistered) {
+        setFormData((prev) => (prev.accountType === 'current' ? prev : { ...prev, accountType: 'current' }))
+      }
+    } catch (error) {
+      console.error('Failed to load vendor type:', error)
+    }
+  }
 
   const loadBankDetails = async () => {
     try {
@@ -154,6 +176,25 @@ export default function BankDetails() {
       setDocuments(kycDocs)
     } catch (error) {
       console.error('Failed to load documents:', error)
+    }
+  }
+
+  // Vendor confirms / denies receipt of the admin's verification amount.
+  const [respondBusy, setRespondBusy] = useState(false)
+  const [notYetModal, setNotYetModal] = useState(false)
+  const [notYetNote, setNotYetNote] = useState('')
+  const respondVerification = async (received: boolean, note?: string) => {
+    try {
+      setRespondBusy(true)
+      const res = await VendorService.respondBankVerification(received, note)
+      if (res?.bankDetails) setBankDetails(res.bankDetails)
+      setMessage({ type: 'success', text: res?.message || (received ? 'Thanks — verification will be finalised shortly.' : 'Noted — the admin will resend the amount.') })
+      setNotYetModal(false)
+      setNotYetNote('')
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error?.response?.data?.error || error?.message || 'Failed to submit your response.' })
+    } finally {
+      setRespondBusy(false)
     }
   }
 
@@ -201,6 +242,13 @@ export default function BankDetails() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+
+    // Registered vendors are locked to a Current Account regardless of any stale
+    // form state — coerce before validating/saving.
+    if (!isUnregistered && formData.accountType !== 'current') {
+      formData.accountType = 'current'
+      setFormData((prev) => ({ ...prev, accountType: 'current' }))
+    }
 
     const validationErrors = validateBankDetails(formData)
     if (Object.keys(validationErrors).length > 0) {
@@ -343,32 +391,33 @@ export default function BankDetails() {
           <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-slate-100">
             <div className="flex items-center gap-2">
               <h2 className="text-base font-semibold text-slate-900">Bank Account</h2>
-              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                bankDetails.isVerified
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-yellow-100 text-yellow-700'
-              }`}>
-                {bankDetails.isVerified ? (
-                  <><CheckCircle className="w-3 h-3" /> Verified</>
-                ) : (
-                  <><AlertCircle className="w-3 h-3" /> Under Review</>
-                )}
-              </span>
+              {(() => {
+                const status = bankDetails.isVerified ? 'VERIFIED' : (bankDetails.verificationStatus || 'PENDING')
+                const cfg: Record<string, { cls: string; label: string }> = {
+                  VERIFIED: { cls: 'bg-green-100 text-green-700', label: 'Verified' },
+                  AMOUNT_SENT: { cls: 'bg-blue-100 text-blue-700', label: 'Action needed — confirm amount' },
+                  RECEIVED: { cls: 'bg-emerald-100 text-emerald-700', label: 'Awaiting admin approval' },
+                  NOT_RECEIVED: { cls: 'bg-red-100 text-red-700', label: 'Reported not received' },
+                  PENDING: { cls: 'bg-yellow-100 text-yellow-700', label: 'Under Review' },
+                }
+                const c = cfg[status] || cfg.PENDING
+                return (
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${c.cls}`}>
+                    {status === 'VERIFIED' ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />} {c.label}
+                  </span>
+                )
+              })()}
             </div>
-            {!bankDetails.isVerified && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={openFormModal}
-              >
-                Edit
-              </Button>
-            )}
+            {/* Once submitted, the vendor can no longer edit — changes must go
+                through the admin so the verification handshake stays trustworthy. */}
           </div>
 
           {/* Card body: saved details */}
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 px-6 py-5">
+            <div className="sm:col-span-2">
+              <dt className="text-xs font-medium text-slate-500">Legal Entity</dt>
+              <dd className="text-sm text-slate-900 mt-0.5">{bankDetails.legalEntity || legalEntity || '—'}</dd>
+            </div>
             <div>
               <dt className="text-xs font-medium text-slate-500">Account Holder Name</dt>
               <dd className="text-sm text-slate-900 mt-0.5">{bankDetails.accountHolderName || '—'}</dd>
@@ -403,16 +452,41 @@ export default function BankDetails() {
             </div>
           </dl>
 
-          {/* Status note */}
-          <div className={`px-6 py-3 text-xs border-t ${
-            bankDetails.isVerified
-              ? 'bg-green-50 border-green-100 text-green-700'
-              : 'bg-yellow-50 border-yellow-100 text-yellow-700'
-          }`}>
-            {bankDetails.isVerified
-              ? 'Verified and active for payouts. Verified details cannot be changed — contact admin for modifications.'
-              : 'Your bank details are under review. You will be notified once verified. You can still edit them until then.'}
-          </div>
+          {/* Verification handshake banner */}
+          {(() => {
+            const status = bankDetails.isVerified ? 'VERIFIED' : (bankDetails.verificationStatus || 'PENDING')
+            if (status === 'AMOUNT_SENT') {
+              return (
+                <div className="px-6 py-4 border-t border-blue-100 bg-blue-50">
+                  <p className="text-sm font-semibold text-blue-800">Did you receive our verification amount?</p>
+                  <p className="text-xs text-blue-700 mt-0.5">
+                    We&apos;ve sent a small test amount to your bank account{bankDetails.verificationNote ? ` (${bankDetails.verificationNote})` : ''}. Please confirm so the admin can finalise your verification.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button type="button" size="sm" disabled={respondBusy} onClick={() => respondVerification(true)}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                      <CheckCircle className="w-4 h-4 mr-1.5" /> Yes, I received it
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" disabled={respondBusy} onClick={() => { setNotYetNote(''); setNotYetModal(true) }}
+                      className="border-red-200 text-red-700 hover:bg-red-50">
+                      Not yet
+                    </Button>
+                  </div>
+                </div>
+              )
+            }
+            const noteCls =
+              status === 'VERIFIED' ? 'bg-green-50 border-green-100 text-green-700' :
+              status === 'RECEIVED' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' :
+              status === 'NOT_RECEIVED' ? 'bg-red-50 border-red-100 text-red-700' :
+              'bg-yellow-50 border-yellow-100 text-yellow-700'
+            const noteText =
+              status === 'VERIFIED' ? 'Verified and active for payouts. Details cannot be changed — contact admin for modifications.' :
+              status === 'RECEIVED' ? 'Thanks for confirming! Your bank details are awaiting final approval by the admin.' :
+              status === 'NOT_RECEIVED' ? 'You reported not receiving the amount. The admin will recheck and resend — you\'ll be notified.' :
+              'Your bank details have been submitted and are under review. The admin will send a small verification amount to confirm your account. To make changes, please contact admin support.'
+            return <div className={`px-6 py-3 text-xs border-t ${noteCls}`}>{noteText}</div>
+          })()}
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 flex flex-col items-center text-center">
@@ -465,6 +539,24 @@ export default function BankDetails() {
               </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Legal Entity — the vendor's registered company name (read-only). */}
+          <div className="md:col-span-2">
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
+              Legal Entity
+            </label>
+            <input
+              type="text"
+              name="legalEntity"
+              value={legalEntity}
+              readOnly
+              disabled
+              aria-readonly="true"
+              title="Your registered company name"
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-slate-600 cursor-not-allowed"
+            />
+            <p className="mt-1 text-xs text-slate-400">Auto-filled from your registered company name.</p>
+          </div>
+
           {/* Account Holder Name */}
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-2">
@@ -574,15 +666,22 @@ export default function BankDetails() {
               <Dropdown
                 id="accountType"
                 value={formData.accountType}
-                options={[
-                  { value: 'savings', label: 'Savings Account' },
-                  { value: 'current', label: 'Current Account' }
-                ]}
+                options={
+                  isUnregistered
+                    ? [
+                        { value: 'savings', label: 'Savings Account' },
+                        { value: 'current', label: 'Current Account' },
+                      ]
+                    : [{ value: 'current', label: 'Current Account' }]
+                }
                 placeholder="Select account type"
                 onChange={(value) => handleChange({ target: { name: 'accountType', value } } as any)}
                 disabled={bankDetails?.isVerified}
               />
             </div>
+            {!isUnregistered && (
+              <p className="mt-1 text-xs text-slate-400">Registered vendors must use a Current Account.</p>
+            )}
             <FieldError message={errors.accountType} />
           </div>
 
@@ -703,8 +802,8 @@ export default function BankDetails() {
             {/* Note info */}
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <p className="text-sm text-yellow-800">
-                <span className="font-semibold">Important:</span> Once bank details are verified by admin, they cannot be changed.
-                Ensure all information is accurate before submission. For any modifications after verification, please contact admin support.
+                <span className="font-semibold">Important:</span> Once you submit, your bank details are locked for review and cannot be edited here.
+                Ensure all information is accurate before submission. For any changes afterwards, please contact admin support.
               </p>
             </div>
           </form>
@@ -923,6 +1022,42 @@ export default function BankDetails() {
         onConfirm={confirmDocumentDelete}
         onCancel={() => setDeleteDocModal({ show: false, documentId: '', documentType: '', loading: false })}
       />
+
+      {/* "Not yet" — capture an optional note explaining why the amount wasn't received */}
+      {notYetModal && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/50 p-4" onClick={() => !respondBusy && setNotYetModal(false)}>
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
+              <div className="flex items-center gap-2">
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-red-50 text-red-600"><AlertCircle className="h-4 w-4" /></span>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Amount not received</h3>
+                  <p className="text-xs text-slate-500">Add a note for the admin (optional)</p>
+                </div>
+              </div>
+              <button onClick={() => !respondBusy && setNotYetModal(false)} className="grid h-8 w-8 place-items-center rounded-full text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="px-5 py-4 space-y-2">
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">Note <span className="font-normal normal-case text-slate-400">(optional)</span></label>
+              <textarea
+                value={notYetNote}
+                onChange={(e) => setNotYetNote(e.target.value.slice(0, 500))}
+                rows={3}
+                placeholder="e.g. Checked my account and statement — no credit received yet."
+                className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#e01a1b] focus:ring-2 focus:ring-[#e01a1b]/15"
+              />
+              <p className="text-[11px] text-slate-400">The admin will recheck and resend the verification amount.</p>
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-5 py-3">
+              <Button type="button" variant="outline" onClick={() => setNotYetModal(false)} disabled={respondBusy}>Cancel</Button>
+              <Button type="button" onClick={() => respondVerification(false, notYetNote.trim() || undefined)} disabled={respondBusy}
+                className="bg-red-600 hover:bg-red-700 text-white">
+                {respondBusy ? 'Submitting…' : 'Submit'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

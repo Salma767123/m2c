@@ -23,7 +23,21 @@ interface Vendor {
   productCategories?: string[];
   productTypes?: string[];
   specializations?: string[];
+  // The vendor's most recent QC inspection (null = never assigned). Drives
+  // whether the vendor is still assignable in this "new assignment" dropdown.
+  latestInspection?: { id: string; status: string; result: string | null; completedAt: string | null } | null;
 }
+
+// A vendor is assignable from the "new assignment" form only when it has no
+// inspection yet (new), or its last inspection lapsed and needs redoing
+// (EXPIRED / CANCELLED = reassignment). Vendors with an active (PENDING /
+// SCHEDULED / IN_PROGRESS / *_PENDING) or COMPLETED inspection are hidden —
+// they're already assigned or done.
+const REASSIGNABLE_STATUSES = new Set(["EXPIRED", "CANCELLED"]);
+const isVendorAssignable = (v: Vendor): boolean => {
+  const status = v.latestInspection?.status?.toUpperCase();
+  return !status || REASSIGNABLE_STATUSES.has(status);
+};
 
 interface QCChecker {
   id: string;
@@ -70,6 +84,7 @@ export default function CreateAssignment() {
             productCategories: v.productCategories || [],
             productTypes: v.productTypes || [],
             specializations: v.specializations || [],
+            latestInspection: v.latestInspection || null,
           };
         });
         setVendors(AllVendors);
@@ -277,10 +292,14 @@ export default function CreateAssignment() {
                       value={formData.vendorId}
                       options={[
                         { value: "", label: "Choose a vendor" },
-                        ...vendors.map((vendor) => ({
-                          value: vendor.id,
-                          label: vendor.companyName,
-                        })),
+                        // Only new / reassignable vendors — plus the deep-linked
+                        // vendor being edited, so it never disappears from its own form.
+                        ...vendors
+                          .filter((vendor) => isVendorAssignable(vendor) || vendor.id === preSelectedVendorId)
+                          .map((vendor) => ({
+                            value: vendor.id,
+                            label: vendor.companyName,
+                          })),
                       ]}
                       onChange={handleVendorChange}
                       placeholder="Select vendor"

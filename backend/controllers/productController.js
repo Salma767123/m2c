@@ -11,6 +11,15 @@ const { getCurrentExchangeRate } = require('./exchangeRateController');
 const { visibilityWhere, isVisibleInRegion, normalizeRegion } = require('../utils/regionVisibility');
 const { buildActiveOffer } = require('../utils/offers');
 
+// Normalize the packaging selection into { packagingType, packingType }.
+//  packagingType: 'PACKED' | 'UNPACKED' | null
+//  packingType:   'BALE' | 'CARTON' | null — only kept when PACKED.
+function normalizePackaging(packagingType, packingType) {
+  const pkg = ['PACKED', 'UNPACKED'].includes(packagingType) ? packagingType : null;
+  const method = pkg === 'PACKED' && ['BALE', 'CARTON'].includes(packingType) ? packingType : null;
+  return { packagingType: pkg, packingType: method };
+}
+
 /**
  * Load live per-product offers for a storefront request and return a decorator that
  * attaches an `activeOffer` badge to each product. Additive and fail-open: any error
@@ -173,6 +182,8 @@ const createProduct = async (req, res) => {
       gstPercentage,
       hsnCode,
       returnable,
+      packagingType,
+      packingType,
 
       // Single Unit Pricing Configuration
       singleUnitSize,
@@ -333,6 +344,8 @@ const createProduct = async (req, res) => {
           hsnCode: hsnCode ? String(hsnCode).trim() : null,
           // Return eligibility — defaults to true unless explicitly turned off.
           returnable: returnable === false || returnable === 'false' || returnable === 'no' ? false : true,
+          // Packaging (packed/unpacked → bale/carton).
+          ...normalizePackaging(packagingType, packingType),
 
           // Single Unit Pricing Configuration
           singleUnitSize: singleUnitSize || null,
@@ -808,6 +821,7 @@ const updateProduct = async (req, res) => {
           ...(updateData.returnable !== undefined && {
             returnable: !(updateData.returnable === false || updateData.returnable === 'false' || updateData.returnable === 'no')
           }),
+          ...(updateData.packagingType !== undefined && normalizePackaging(updateData.packagingType, updateData.packingType)),
 
           // Single Unit Pricing Configuration
           ...(updateData.singleUnitSize !== undefined && { singleUnitSize: updateData.singleUnitSize }),
@@ -1210,7 +1224,7 @@ const getAvailableInventoryItems = async (req, res) => {
 const approveProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { adminPrice, variantPrices, originalPrice, variantOriginalPrices, priceINR, priceUSD, originalPriceINR, originalPriceUSD, priceVisibility, variantPricesINR, variantPricesUSD, variantOriginalPricesINR, variantOriginalPricesUSD, variantVisibilities, subCategory, categoryAction, categoryMergeTargetId } = req.body;
+    const { adminPrice, variantPrices, originalPrice, variantOriginalPrices, priceINR, priceUSD, originalPriceINR, originalPriceUSD, priceVisibility, variantPricesINR, variantPricesUSD, variantOriginalPricesINR, variantOriginalPricesUSD, variantVisibilities, subCategory, categoryAction, categoryMergeTargetId, returnable } = req.body;
     const adminId = req.user.id;
 
     // Find the product with variants
@@ -1343,6 +1357,12 @@ const approveProduct = async (req, res) => {
     // categories have none). Only overwrite when a non-empty value is sent.
     if (typeof subCategory === 'string' && subCategory.trim()) {
       updateData.subCategory = subCategory.trim();
+    }
+
+    // Return eligibility is finalised by the admin at approval (governs the
+    // customer's return option on the website). Only set when explicitly sent.
+    if (returnable !== undefined) {
+      updateData.returnable = !(returnable === false || returnable === 'false' || returnable === 'no');
     }
 
     // Handle pricing based on whether product has variants
@@ -1660,6 +1680,29 @@ const assignQCCheckerToProduct = async (req, res) => {
       data: { productId: product.id }
     }).catch(() => {});
 
+    // Email the vendor immediately that a product inspection is assigned.
+    // Fire-and-forget — a mail failure must never fail the assignment itself.
+    try {
+      const vendorRec = await prisma.vendor.findUnique({
+        where: { id: product.vendorId },
+        select: { companyName: true, ownerName: true, email: true, businessEmail: true, ownerEmail: true },
+      });
+      const { sendProductInspectionAssignedEmail } = require('../utils/email/vendorEmailSender');
+      sendProductInspectionAssignedEmail({
+        to: vendorRec?.email || vendorRec?.businessEmail || vendorRec?.ownerEmail,
+        companyName: vendorRec?.companyName,
+        ownerName: vendorRec?.ownerName,
+        productName: product.name,
+        checkerName: checker?.name,
+        scheduledDate: qcAssignment.scheduledDate,
+        scheduledTime: qcAssignment.scheduledTime,
+        priority: qcAssignment.priority,
+        estimatedDuration: qcAssignment.estimatedDuration,
+      }).catch((e) => console.error('Product-inspection vendor email failed:', e?.message || e));
+    } catch (e) {
+      console.error('Product-inspection vendor email dispatch error:', e?.message || e);
+    }
+
     res.json({
       success: true,
       message: product.assignedQcId ? 'QC Checker reassigned successfully' : 'QC Checker assigned successfully',
@@ -1764,6 +1807,8 @@ const createProductByAdmin = async (req, res) => {
       gstPercentage,
       hsnCode,
       returnable,
+      packagingType,
+      packingType,
       adminFixedPrice, // Admin can set their own price
       priceINR,
       priceUSD,
@@ -1966,6 +2011,7 @@ const createProductByAdmin = async (req, res) => {
           hsnCode: hsnCode ? String(hsnCode).trim() : null,
           // Return eligibility — defaults to true unless explicitly turned off.
           returnable: returnable === false || returnable === 'false' || returnable === 'no' ? false : true,
+          ...normalizePackaging(packagingType, packingType),
           adminFixedPrice: numOrNull(adminFixedPrice),
           ...productPrices,
           priceVisibility: priceVisibility || 'BOTH',
@@ -2258,6 +2304,7 @@ const updateProductByAdmin = async (req, res) => {
         ...(updateData.returnable !== undefined && {
           returnable: !(updateData.returnable === false || updateData.returnable === 'false' || updateData.returnable === 'no')
         }),
+        ...(updateData.packagingType !== undefined && normalizePackaging(updateData.packagingType, updateData.packingType)),
         ...(updateData.adminFixedPrice !== undefined && {
           adminFixedPrice: updateData.adminFixedPrice ? parseFloat(updateData.adminFixedPrice) : null
         }),
@@ -3249,6 +3296,8 @@ const getPublicProduct = async (req, res) => {
         dispatchTimeline: true,
         logisticsConfig: true,
         returnable: true, // return eligibility — drives the "Easy return" badge + policy note
+        packagingType: true, // 'PACKED' | 'UNPACKED'
+        packingType: true, // 'BALE' | 'CARTON' (when packed)
         createdAt: true,
         updatedAt: true,
         inventory: {

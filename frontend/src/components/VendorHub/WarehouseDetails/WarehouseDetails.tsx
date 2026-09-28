@@ -143,6 +143,10 @@ export default function WarehouseDetails({
     // warehouse differs from the legal/factory address. (When they're the same the
     // field is hidden and the backend treats a blank value as FACTORY.)
     productInspectionSite: data.productInspectionSite || "",
+    // Multi-select: the vendor may pick FACTORY, WAREHOUSE, or both.
+    productInspectionSites: (Array.isArray(data.productInspectionSites)
+      ? data.productInspectionSites
+      : (data.productInspectionSite ? [data.productInspectionSite] : [])) as string[],
     factoryImages: normaliseFactoryImages(data.factoryImages),
   });
 
@@ -185,6 +189,10 @@ export default function WarehouseDetails({
       warehouseLatitude: data.warehouseLatitude ?? "",
       warehouseLongitude: data.warehouseLongitude ?? "",
       productInspectionSite: data.productInspectionSite || "",
+      // Multi-select: the vendor may pick FACTORY, WAREHOUSE, or both.
+      productInspectionSites: Array.isArray(data.productInspectionSites)
+        ? data.productInspectionSites
+        : (data.productInspectionSite ? [data.productInspectionSite] : []),
       factoryImages: normaliseFactoryImages(data.factoryImages),
     });
   }
@@ -222,6 +230,19 @@ export default function WarehouseDetails({
   const handleBlur = useCallback((field: string) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
   }, []);
+
+  // Multi-select toggle for the product-handling site(s). Keeps the legacy single
+  // `productInspectionSite` in sync (= first selected) for older read paths.
+  const toggleInspectionSite = useCallback((id: string) => {
+    if (isLinked) return;
+    setFormData((prev: any) => {
+      const current: string[] = Array.isArray(prev.productInspectionSites) ? prev.productInspectionSites : [];
+      const next = current.includes(id) ? current.filter((s) => s !== id) : [...current, id];
+      return { ...prev, productInspectionSites: next, productInspectionSite: next[0] || '' };
+    });
+    setErrors((prev) => (prev.productInspectionSite ? { ...prev, productInspectionSite: '' } : prev));
+    setTouched((prev) => ({ ...prev, productInspectionSite: true }));
+  }, [isLinked]);
 
   // ── ZIP / PIN code lookup (warehouse address) ─────────────────────────
   const handleWarehouseZipResult = useCallback((place: ZipPlace) => {
@@ -261,7 +282,7 @@ export default function WarehouseDetails({
       const lngErr = validateCoordinate(formData.warehouseLongitude, 'longitude');
       if (lngErr) newErrors.warehouseLongitude = lngErr;
       // Product-handling site must be actively chosen — no default.
-      if (!formData.productInspectionSite)
+      if (!formData.productInspectionSites || formData.productInspectionSites.length === 0)
         newErrors.productInspectionSite = 'Please select where your products are handled';
     }
 
@@ -432,7 +453,7 @@ export default function WarehouseDetails({
       if (isLinked) {
         return formData.warehouseAddress && formData.warehouseCity ? 'complete' : 'partial';
       }
-      const required = [formData.warehouseAddress, formData.warehouseCity, formData.warehouseState, formData.warehouseZip, formData.warehouseCountry, formData.warehouseLatitude, formData.warehouseLongitude, formData.productInspectionSite];
+      const required = [formData.warehouseAddress, formData.warehouseCity, formData.warehouseState, formData.warehouseZip, formData.warehouseCountry, formData.warehouseLatitude, formData.warehouseLongitude, (formData.productInspectionSites?.length || 0) > 0];
       // `warehouseCountry` defaults to "India", so exclude it from the
       // "in progress" trigger — an untouched address reads as empty.
       const userEntered = [formData.warehouseAddress, formData.warehouseCity, formData.warehouseState, formData.warehouseZip];
@@ -901,11 +922,11 @@ export default function WarehouseDetails({
                 <span className="text-brand-500" aria-hidden="true">*</span>
               </label>
               <p className="text-xs text-slate-500 mb-3">
-                QC checkers will inspect your products at this location. Pick the address where the goods physically are.
+                QC checkers will inspect your products at these location(s). Select every address where the goods physically are — you can pick both.
               </p>
               <div
                 className="flex flex-wrap gap-2.5"
-                role="radiogroup"
+                role="group"
                 aria-label="Product handling site"
                 data-field="productInspectionSite"
               >
@@ -915,9 +936,9 @@ export default function WarehouseDetails({
                 ].map((opt) => (
                   <ToggleButton
                     key={opt.id}
-                    selected={formData.productInspectionSite === opt.id}
+                    selected={(formData.productInspectionSites || []).includes(opt.id)}
                     invalid={!!(errors.productInspectionSite && touched.productInspectionSite)}
-                    onClick={() => handleInputChange('productInspectionSite', opt.id)}
+                    onClick={() => toggleInspectionSite(opt.id)}
                   >
                     <span className="font-semibold">{opt.label}</span>
                   </ToggleButton>

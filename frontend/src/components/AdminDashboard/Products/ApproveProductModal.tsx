@@ -18,6 +18,8 @@ export interface ApprovableProduct {
   vendor?: { companyName?: string } | null
   basePrice: number
   originalPrice?: number | null
+  /** Current return eligibility (prefills the approval control). */
+  returnable?: boolean
   // Physical specs — shown read-only so the admin can judge the margin. GSM
   // lives inside fabricSpecifications; weight/dimensions are product columns.
   weight?: string | null
@@ -75,6 +77,7 @@ export default function ApproveProductModal({ product, open, onClose, onApproved
   const [variantOriginalPrices, setVariantOriginalPrices] = useState<Record<string, string>>({})
   const [originalPriceINR, setOriginalPriceINR] = useState('')
   const [priceVisibility, setPriceVisibility] = useState<'IN_ONLY' | 'COM_ONLY' | 'BOTH'>('BOTH')
+  const [returnable, setReturnable] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   // Profit margin % applied over the vendor base price to fill selling prices.
   const [margin, setMargin] = useState('')
@@ -126,6 +129,7 @@ export default function ApproveProductModal({ product, open, onClose, onApproved
     setOriginalPrice(product.originalPrice != null ? String(product.originalPrice) : '')
     setOriginalPriceINR('')
     setPriceVisibility('BOTH')
+    setReturnable(product.returnable !== false)
     setMargin('')
     setInvalid(new Set())
     const p: Record<string, string> = {}
@@ -250,6 +254,7 @@ export default function ApproveProductModal({ product, open, onClose, onApproved
         multiCurrency,
         undefined,
         categoryResolution,
+        returnable,
       )
       if (response.success) {
         showSuccessToast('Product Approved', 'The product has been approved successfully.')
@@ -477,6 +482,25 @@ export default function ApproveProductModal({ product, open, onClose, onApproved
             </div>
           </div>
           <p className="text-xs text-brand-600/80 mt-3">INR/USD prices override the admin selling price for their region. Original prices show as strikethrough.</p>
+        </section>
+
+        {/* Return eligibility — finalised by the admin at approval; governs the
+            customer's return option on the website. */}
+        <section className="mb-6">
+          <h4 className="text-[11px] font-bold uppercase tracking-wider text-brand-500 mb-1">Return Policy</h4>
+          <div className="max-w-xs">
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Return Applicable</label>
+            <Dropdown
+              value={returnable ? 'yes' : 'no'}
+              options={[
+                { value: 'yes', label: 'Yes — returns allowed' },
+                { value: 'no', label: 'No — no returns' },
+              ]}
+              onChange={(v) => setReturnable(v === 'yes')}
+              placeholder="Select"
+            />
+            <p className="text-xs text-slate-500 mt-1">When Yes, customers can raise a return within 7 days of delivery. When No, the return option is hidden for this product.</p>
+          </div>
         </section>
 
         {/* Variant Pricing */}
