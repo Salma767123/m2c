@@ -497,6 +497,18 @@ function OverviewTab({ product, primaryImage }: { product: ProductDetailData; pr
                                 />
                             )}
                             {product.uom && <Row icon={<Package className="w-4 h-4" />} label="Selling Unit (UOM)" value={uomLabel(product.uom)} />}
+                            {(product as any).packagingType && (
+                                <Row
+                                    icon={<Package className="w-4 h-4" />}
+                                    label="Packaging"
+                                    value={(product as any).packagingType === 'PACKED'
+                                        ? `Packed${(product as any).packingType === 'BALE' ? ' — Bale pack' : (product as any).packingType === 'CARTON' ? ' — Carton box' : ''}`
+                                        : `Unpacked${(product as any).unpackedType === 'STITCHED' ? ' — Stitched' : (product as any).unpackedType === 'UNSTITCHED' ? ' — Unstitched' : (product as any).unpackedType === 'OTHER' ? ' — Other' : ''}`}
+                                />
+                            )}
+                            {(product as any).packagingType === 'UNPACKED' && (product as any).unpackedNote && (
+                                <Row icon={<FileText className="w-4 h-4" />} label="Packaging Note" value={(product as any).unpackedNote} />
+                            )}
                             {product.description && (
                                 <div className="sm:col-span-2">
                                     <Row

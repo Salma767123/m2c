@@ -13,6 +13,8 @@ export interface Coupon {
     startDate: string;
     expiryDate: string;
     isActive: boolean;
+    /** Region availability — which storefront the coupon can be redeemed on. */
+    region?: 'IN_ONLY' | 'COM_ONLY' | 'BOTH';
     usageLimit?: number;
     usedCount?: number;
     perUserLimit?: number;

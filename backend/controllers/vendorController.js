@@ -1112,6 +1112,15 @@ const registerVendor = async (req, res) => {
     // can't be reused for another registration.
     if (registrationOtp) await consumeOtp(registrationOtp.id);
 
+    // Auto-start any workflow configured to trigger on vendor submission.
+    // Fire-and-forget: never blocks or breaks registration.
+    const { triggerWorkflowEvent } = require('../utils/workflowEvents');
+    triggerWorkflowEvent('vendor.submitted', {
+      subjectType: 'VENDOR', subjectId: vendor.id, subjectLabel: vendor.companyName,
+      initiatedById: req.user?.id || null, initiatedByName: req.user?.name || vendor.companyName,
+      data: { vendorCode: vendor.vendorCode, ownerName: vendor.ownerName },
+    });
+
     res.status(201).json({
       message: 'Vendor registration submitted successfully',
       vendor: {
@@ -2500,6 +2509,13 @@ const approveVendor = async (req, res) => {
         message: `Congratulations! Your vendor application for "${vendor.companyName}" has been approved.`,
       }).catch(() => { });
 
+      // Auto-start any workflow configured to trigger on vendor approval.
+      const { triggerWorkflowEvent } = require('../utils/workflowEvents');
+      triggerWorkflowEvent('vendor.approved', {
+        subjectType: 'VENDOR', subjectId: vendor.id, subjectLabel: vendor.companyName,
+        initiatedById: adminId, initiatedByName: adminName,
+      });
+
       res.json({
         message: 'Vendor approved successfully and credentials sent via email',
         vendor: { ...vendor, password: undefined }
@@ -2617,6 +2633,13 @@ const confirmApproval = async (req, res) => {
       }).catch(() => { });
     }
 
+    // Auto-start any workflow configured to trigger on vendor approval.
+    const { triggerWorkflowEvent } = require('../utils/workflowEvents');
+    triggerWorkflowEvent('vendor.approved', {
+      subjectType: 'VENDOR', subjectId: vendor.id, subjectLabel: vendor.companyName,
+      initiatedById: adminId, initiatedByName: adminName,
+    });
+
     res.json({
       message: 'Vendor approval confirmed. Credentials sent via email.',
       vendor: { ...vendor, password: undefined }
@@ -2676,6 +2699,103 @@ const cancelApproval = async (req, res) => {
     });
   } catch (error) {
     console.error('Cancel approval error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Review a vendor's registration form (staff gate before QC assignment).
+// decision: 'QUALIFIED' -> status REVIEWED (proceeds to Assign QC)
+//           'REJECT'    -> status REJECTION_PENDING (routes to an authorised
+//                          person who holds vendor approve permission for the
+//                          final rejection). Requires a reason.
+const reviewVendor = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+    const { decision, note, reason } = req.body;
+
+    if (!['QUALIFIED', 'REJECT'].includes(decision)) {
+      return res.status(400).json({ error: "decision must be 'QUALIFIED' or 'REJECT'" });
+    }
+
+    const existingVendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
+    if (!existingVendor) return res.status(404).json({ error: 'Vendor not found' });
+
+    // A registration can only be reviewed before it enters the QC/approval stages.
+    if (!['PENDING', 'UNDER_REVIEW'].includes(existingVendor.status)) {
+      return res.status(400).json({ error: `Only a pending registration can be reviewed (current status: ${existingVendor.status}).` });
+    }
+
+    const actorId = req.user?.id || req.userId;
+    const actorName = req.user?.name || req.user?.email;
+    const now = new Date();
+
+    if (decision === 'QUALIFIED') {
+      const vendor = await prisma.vendor.update({
+        where: { id: vendorId },
+        data: {
+          status: 'REVIEWED',
+          reviewedBy: actorId,
+          reviewedByName: actorName,
+          reviewedAt: now,
+          reviewNote: note || null,
+        },
+      });
+
+      // Tell the team the registration is cleared and ready for QC assignment.
+      const { createNotificationForRole } = require('./notificationController');
+      createNotificationForRole({
+        role: 'ADMIN', type: 'VENDOR_REVIEWED',
+        title: 'Vendor Reviewed & Qualified',
+        message: `"${vendor.companyName}" passed registration review — ready to assign a QC checker for factory inspection.`,
+        data: { vendorId: vendor.id, screen: 'vendors' },
+      }).catch(() => {});
+
+      const { triggerWorkflowEvent } = require('../utils/workflowEvents');
+      triggerWorkflowEvent('vendor.reviewed', {
+        subjectType: 'VENDOR', subjectId: vendor.id, subjectLabel: vendor.companyName,
+        initiatedById: actorId, initiatedByName: actorName,
+      });
+
+      return res.json({ message: 'Registration reviewed & qualified. Ready for QC assignment.', vendor: { ...vendor, password: undefined } });
+    }
+
+    // decision === 'REJECT'
+    if (!reason || reason.trim().length === 0) {
+      return res.status(400).json({ error: 'A rejection reason is required.' });
+    }
+
+    const vendor = await prisma.vendor.update({
+      where: { id: vendorId },
+      data: {
+        status: 'REJECTION_PENDING',
+        rejectionReason: reason.trim(),
+        rejectionRequestedBy: actorId,
+        rejectionRequestedAt: now,
+        reviewedBy: actorId,
+        reviewedByName: actorName,
+        reviewedAt: now,
+        reviewNote: note || null,
+      },
+    });
+
+    // Route to the authorised person(s) who can finalise rejections.
+    const { createNotificationForRole } = require('./notificationController');
+    createNotificationForRole({
+      role: 'ADMIN', type: 'VENDOR_REJECTION_PENDING',
+      title: 'Vendor Rejection Needs Final Decision',
+      message: `${actorName} proposed rejecting "${vendor.companyName}". Reason: ${reason.trim()}`,
+      data: { vendorId: vendor.id, screen: 'vendors' },
+    }).catch(() => {});
+
+    const { triggerWorkflowEvent } = require('../utils/workflowEvents');
+    triggerWorkflowEvent('vendor.review_rejected', {
+      subjectType: 'VENDOR', subjectId: vendor.id, subjectLabel: vendor.companyName,
+      initiatedById: actorId, initiatedByName: actorName, data: { reason: reason.trim() },
+    });
+
+    return res.json({ message: 'Rejection proposed. Sent to an authorised person for the final decision.', vendor: { ...vendor, password: undefined } });
+  } catch (error) {
+    console.error('Review vendor error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -2777,16 +2897,12 @@ const rejectVendor = async (req, res) => {
   }
 };
 
-// Confirm vendor rejection (Super Admin only)
+// Confirm (finalise) a vendor rejection. Any admin holding vendor approve
+// permission may do this (route-gated). For separation of duties, the person
+// who proposed the rejection cannot also confirm it — unless they are Super Admin.
 const confirmRejection = async (req, res) => {
   try {
     const { vendorId } = req.params;
-
-    // Only Super Admin can confirm
-    const isSuperAdmin = (req.user.roleName || '').toLowerCase().trim() === 'super admin';
-    if (!isSuperAdmin) {
-      return res.status(403).json({ error: 'Only Super Admin can confirm vendor rejections' });
-    }
 
     const existingVendor = await prisma.vendor.findUnique({
       where: { id: vendorId }
@@ -2798,6 +2914,11 @@ const confirmRejection = async (req, res) => {
 
     if (existingVendor.status !== 'REJECTION_PENDING') {
       return res.status(400).json({ error: 'Vendor is not in rejection pending state' });
+    }
+
+    const isSuperAdmin = (req.user.roleName || '').toLowerCase().trim() === 'super admin';
+    if (!isSuperAdmin && existingVendor.rejectionRequestedBy && existingVendor.rejectionRequestedBy === (req.user?.id || req.userId)) {
+      return res.status(403).json({ error: 'The final rejection must be confirmed by a different authorised person than the one who proposed it.' });
     }
 
     const adminId = req.user?.id || req.userId;
@@ -2842,7 +2963,7 @@ const confirmRejection = async (req, res) => {
         role: 'ADMIN',
         type: 'VENDOR_REJECTION_CONFIRMED',
         title: 'Vendor Rejection Confirmed',
-        message: `Your rejection of "${vendor.companyName}" has been confirmed by Super Admin.`,
+        message: `Your rejection of "${vendor.companyName}" has been confirmed by ${adminName}.`,
         data: { vendorId: vendor.id }
       }).catch(() => { });
     }
@@ -2857,16 +2978,11 @@ const confirmRejection = async (req, res) => {
   }
 };
 
-// Cancel vendor rejection (Super Admin only)
+// Cancel a pending vendor rejection (dismiss the proposal). Any admin holding
+// vendor approve permission may do this (route-gated).
 const cancelRejection = async (req, res) => {
   try {
     const { vendorId } = req.params;
-
-    // Only Super Admin can cancel
-    const isSuperAdmin = (req.user.roleName || '').toLowerCase().trim() === 'super admin';
-    if (!isSuperAdmin) {
-      return res.status(403).json({ error: 'Only Super Admin can cancel vendor rejections' });
-    }
 
     const existingVendor = await prisma.vendor.findUnique({
       where: { id: vendorId }
@@ -3150,8 +3266,13 @@ const assignQc = async (req, res) => {
       return res.status(404).json({ error: 'QC Checker not found' });
     }
 
-    // Update vendor with assigned QC Checker and change status if it was pending
-    const statusUpdate = vendor.status === 'PENDING' ? 'UNDER_REVIEW' : vendor.status;
+    // Registration must be reviewed & qualified before a factory inspection is scheduled.
+    if (vendor.status === 'PENDING') {
+      return res.status(400).json({ error: 'Review the vendor registration first (mark it Reviewed & Qualified) before assigning a QC checker.' });
+    }
+
+    // Once a checker is assigned, the vendor moves into the inspection stage.
+    const statusUpdate = ['REVIEWED', 'PENDING'].includes(vendor.status) ? 'UNDER_REVIEW' : vendor.status;
 
     const updatedVendor = await prisma.vendor.update({
       where: { id: vendorId },
@@ -3433,6 +3554,7 @@ module.exports = {
   approveVendor,
   confirmApproval,
   cancelApproval,
+  reviewVendor,
   rejectVendor,
   confirmRejection,
   cancelRejection,

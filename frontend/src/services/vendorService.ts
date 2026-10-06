@@ -388,6 +388,10 @@ export interface VendorProfile {
   rejectionRequestedBy?: string;
   rejectionRequestedByName?: string;
   rejectionRequestedAt?: string;
+  reviewedBy?: string;
+  reviewedByName?: string;
+  reviewedAt?: string;
+  reviewNote?: string;
   certifications: any[];
   documents: any[];
   bankDetails?: any;
@@ -1049,6 +1053,20 @@ class VendorService {
     } catch (error) {
       throw error;
     }
+  }
+
+  // Staff: Review a vendor registration form.
+  // decision 'QUALIFIED' -> status REVIEWED (proceeds to QC assignment)
+  // decision 'REJECT'    -> status REJECTION_PENDING (routes for final rejection)
+  static async reviewVendor(vendorId: string, decision: 'QUALIFIED' | 'REJECT', opts?: { note?: string; reason?: string }) {
+    const token = this.getAdminToken();
+    if (!token) throw new Error('No admin authentication token found');
+    const response = await axiosInstance.put(
+      `/vendors/${vendorId}/review`,
+      { decision, note: opts?.note, reason: opts?.reason },
+      { headers: { 'Authorization': `Bearer ${token}` } },
+    );
+    return response.data;
   }
 
   // Admin: Reject vendor

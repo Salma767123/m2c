@@ -40,16 +40,6 @@ const BottomBar = () => {
         <div className="flex flex-col items-center justify-between gap-3 border-t border-[#e6dbcc] py-5 sm:flex-row sm:gap-6">
           <p className="order-2 text-center text-[13px] text-[#7d736c] sm:order-1 sm:text-left">
             © {new Date().getFullYear()} {companyName}. All Rights Reserved
-            <span className="mx-1.5 text-[#b3a99f]" aria-hidden>·</span>
-            Developed by{" "}
-            <a
-              href="https://mntfuture.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium text-[#3f3a35] underline-offset-2 transition-colors hover:text-[#c41617] hover:underline"
-            >
-              MnT Future
-            </a>
           </p>
           <div className="order-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 sm:order-2 sm:justify-end">
             {legal.map((l, i) => (

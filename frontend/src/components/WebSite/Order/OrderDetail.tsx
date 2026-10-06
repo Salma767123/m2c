@@ -946,6 +946,14 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                         </span>
                       )}
                     </div>
+
+                    {/* Credit points redeemed — a tender applied after wallet. */}
+                    {(orderDetails.pointsRedeemed ?? 0) > 0 && (
+                      <div className="flex items-center justify-between text-[#157f4a]">
+                        <span>Points redeemed ({orderDetails.pointsRedeemed} points)</span>
+                        <span className="font-medium tabular-nums">−{money(orderDetails.pointsRedeemedValue || 0)}</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="mt-4 border-t border-slate-100 pt-4">
@@ -961,6 +969,11 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                       <span className="text-[15px] font-semibold text-slate-900 sm:text-base">Total payable</span>
                       <span className="text-2xl font-bold tabular-nums text-[#e01a1b]">{money(orderDetails.totalAmount)}</span>
                     </div>
+                    {(orderDetails.pointsEarned ?? 0) > 0 && (
+                      <p className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-[12px] font-medium text-amber-800 ring-1 ring-amber-200">
+                        You earned {orderDetails.pointsEarned} points on this order.
+                      </p>
+                    )}
                     {orderDetails.currency === 'INR' && (
                       <p className="mt-1.5 text-[11.5px] leading-snug text-slate-400">
                         Taxes are calculated based on applicable product tax rates.

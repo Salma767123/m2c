@@ -442,14 +442,25 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
         {(() => {
           const mode = String((fd as any).packagingType || "").toUpperCase()
           if (!mode) return null
+          const uType = String((fd as any).unpackedType || "").toUpperCase()
+          const uTypeLabel = uType === "STITCHED" ? "Stitched" : uType === "UNSTITCHED" ? "Unstitched" : uType === "OTHER" ? "Other" : ""
+          const uNote = String((fd as any).unpackedNote || "").trim()
           const label = mode === "PACKED"
             ? `Packed${(fd as any).packingType ? ` — ${String((fd as any).packingType).toUpperCase() === "BALE" ? "Bale pack" : "Carton box"}` : ""}`
-            : "Unpacked"
+            : `Unpacked${uTypeLabel ? ` — ${uTypeLabel}` : ""}`
           return (
-            <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
-              <span className="text-slate-500">Packaging Mode:</span>
-              <span className="font-semibold text-slate-800">{label}</span>
-              {mode === "UNPACKED" && <span className="text-xs italic text-slate-400">— carton/retail packaging, measurement &amp; functional tests not applicable</span>}
+            <div className="mb-3 space-y-1">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-slate-500">Packaging Mode:</span>
+                <span className="font-semibold text-slate-800">{label}</span>
+                {mode === "UNPACKED" && <span className="text-xs italic text-slate-400">— carton/retail packaging, measurement &amp; functional tests not applicable</span>}
+              </div>
+              {mode === "UNPACKED" && uNote && (
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="text-slate-500">Packaging Note:</span>
+                  <span className="text-slate-800">{uNote}</span>
+                </div>
+              )}
             </div>
           )
         })()}

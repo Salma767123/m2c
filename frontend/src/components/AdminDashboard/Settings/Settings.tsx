@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { User, Mail, Phone, MapPin, Building2, Shield, Save, FileText, CreditCard, Upload, Image as ImageIcon, DollarSign, Key, Eye, EyeOff, Percent, Warehouse, Globe, Camera, Truck } from "lucide-react";
+import { User, Mail, Phone, MapPin, Building2, Shield, Save, FileText, CreditCard, Upload, Image as ImageIcon, DollarSign, Key, Eye, EyeOff, Percent, Warehouse, Globe, Camera, Truck, Gift } from "lucide-react";
 import ImageCropModal from "@/components/UI/ImageCropModal";
 import Dropdown from "@/components/UI/Dropdown";
 import GSTSettingsTab from "./GSTSettingsTab";
@@ -10,7 +10,9 @@ import SEOSettingsTab from "./SEOSettingsTab";
 import BannerSettingsTab from "./BannerSettingsTab";
 import ExchangeRateTab from "./ExchangeRateTab";
 import EmailTemplatesTab from "./EmailTemplatesTab";
+import CreditPointsSettingsTab from "./CreditPointsSettingsTab";
 import CourierManagement from "@/components/AdminDashboard/Couriers/CourierManagement";
+import DeliveryZones from "@/components/AdminDashboard/Logistics/DeliveryZones";
 import InvoiceSettings from "../Billing/Settings/InvoiceSettings";
 import { Card, CardContent } from "../../UI/Card";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
@@ -51,7 +53,7 @@ export default function Settings() {
     zipCode: "10001",
   });
 
-  const [activeTab, setActiveTab] = useState<"profile" | "company" | "payment" | "gst" | "hub" | "invoice" | "seo" | "banner" | "vendor-notif" | "exchange-rate" | "email-templates" | "couriers">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "company" | "payment" | "gst" | "hub" | "invoice" | "seo" | "banner" | "vendor-notif" | "exchange-rate" | "email-templates" | "couriers" | "delivery-zones" | "credit-points">("profile");
 
   // Profile form state
   const [profileData, setProfileData] = useState({
@@ -695,6 +697,26 @@ export default function Settings() {
               >
                 <Truck className="h-4 w-4 inline mr-2" />
                 Courier Partners
+              </button>
+              <button
+                onClick={() => setActiveTab("delivery-zones")}
+                className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "delivery-zones"
+                  ? "border-brand-500 text-brand-600"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
+                  }`}
+              >
+                <MapPin className="h-4 w-4 inline mr-2" />
+                Delivery Zones
+              </button>
+              <button
+                onClick={() => setActiveTab("credit-points")}
+                className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "credit-points"
+                  ? "border-brand-500 text-brand-600"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
+                  }`}
+              >
+                <Gift className="h-4 w-4 inline mr-2" />
+                Credit Points
               </button>
             </>
           )}
@@ -1931,6 +1953,16 @@ export default function Settings() {
 
       {activeTab === "couriers" && canAccessAdminSettings && (
         <CourierManagement />
+      )}
+
+      {/* Delivery Zones Tab */}
+      {activeTab === "delivery-zones" && canAccessAdminSettings && (
+        <DeliveryZones />
+      )}
+
+      {/* Credit Points Settings Tab */}
+      {activeTab === "credit-points" && canAccessAdminSettings && (
+        <CreditPointsSettingsTab />
       )}
     </div>
   );

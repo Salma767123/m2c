@@ -49,6 +49,25 @@ const requestWithdrawal = async (req, res) => {
             return res.status(400).json({ success: false, message: `Enter an amount of at least ₹${MIN_WITHDRAWAL}.` });
         }
 
+        // Idempotency guard: a double-click, retry, or rapid re-submit of the same
+        // amount shouldn't create two payouts. Reject an identical withdrawal from
+        // the same customer within a short window.
+        const DUP_WINDOW_MS = 60 * 1000;
+        const recentDup = await prisma.walletWithdrawal.findFirst({
+            where: {
+                customerId: userId,
+                amount,
+                createdAt: { gte: new Date(Date.now() - DUP_WINDOW_MS) },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+        if (recentDup) {
+            return res.status(409).json({
+                success: false,
+                message: 'A withdrawal for this amount was just submitted. Please wait a moment before trying again.',
+            });
+        }
+
         // Validate payout destination.
         let payout = {};
         if (method === 'UPI') {

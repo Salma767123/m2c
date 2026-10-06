@@ -31,12 +31,13 @@ function normalizeCourierRegion(value) {
   return null;
 }
 
-// Couriers available for a given region + transport mode.
+// Couriers available for a given region + transport mode. A courier tagged
+// 'BOTH' serves the domestic (.in) and international (.com) storefronts alike.
 function getCouriers(region, mode) {
   const r = normalizeCourierRegion(region);
   const m = mode ? String(mode).toUpperCase() : null;
   return COURIERS.filter(
-    (c) => (!r || c.region === r) && (!m || c.modes.includes(m))
+    (c) => (!r || c.region === r || c.region === 'BOTH') && (!m || c.modes.includes(m))
   );
 }
 
@@ -65,7 +66,8 @@ async function isCourierAvailable(id, region, mode) {
         where: {
           id: String(id),
           isActive: true,
-          ...(r ? { region: r } : {}),
+          // A 'BOTH' courier is valid for either region query.
+          ...(r ? { region: { in: [r, 'BOTH'] } } : {}),
           ...(m ? { modes: { has: m } } : {}),
         },
         select: { id: true },

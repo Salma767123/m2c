@@ -128,6 +128,14 @@ export interface Order {
     igstAmount?: number;
     taxType?: 'INTRASTATE' | 'INTERSTATE' | null;
     discount: number;
+    /** Wallet store credit applied at checkout (order currency) — a tender reducing amount paid. */
+    walletApplied?: number;
+    /** Credit (loyalty) points redeemed at checkout (whole points) and their money value
+     *  in the order currency — a tender reducing amount paid, like wallet. */
+    pointsRedeemed?: number;
+    pointsRedeemedValue?: number;
+    /** Credit points earned on this order (whole points). */
+    pointsEarned?: number;
     /** Currency the buyer was actually charged in — 'INR' on .in, 'USD' on .com. */
     currency?: 'INR' | 'USD';
     /** INR-per-USD rate snapshotted at purchase. Null on INR/pre-snapshot orders. */
@@ -210,6 +218,10 @@ export interface CreateOrderParams {
     /** Wallet store credit to apply (in the order currency). Server clamps it to the
      *  available balance and the order total, and debits the wallet accordingly. */
     walletApplied?: number;
+    /** Credit (loyalty) points to redeem (whole points). Applied AFTER wallet in the
+     *  tender order. Server clamps it to the balance, the min-to-redeem floor and the
+     *  max-redeem % cap, converts it to a value and debits the points ledger. */
+    pointsRedeemed?: number;
 }
 
 class OrderService {

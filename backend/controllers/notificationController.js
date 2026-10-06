@@ -195,9 +195,34 @@ const getUnreadCount = async (req, res) => {
   }
 };
 
+/**
+ * Notify every ADMIN whose role holds a given permission (plus Super Admin).
+ * Used to ping the authorised approver(s) when something is submitted for approval.
+ */
+const createNotificationForPermission = async (permission, { type, title, message, data }) => {
+  try {
+    const roles = await prisma.role.findMany({
+      where: { OR: [{ permissions: { has: permission } }, { name: 'Super Admin' }] },
+      select: { id: true },
+    });
+    const roleIds = roles.map((r) => r.id);
+    if (roleIds.length === 0) return;
+    const admins = await prisma.admin.findMany({
+      where: { roleId: { in: roleIds }, isActive: true },
+      select: { id: true },
+    });
+    await Promise.all(admins.map((a) =>
+      createNotification({ userId: a.id, role: 'ADMIN', type, title, message, data }).catch(() => {})
+    ));
+  } catch (error) {
+    console.error('createNotificationForPermission error:', error);
+  }
+};
+
 module.exports = {
   createNotification,
   createNotificationForRole,
+  createNotificationForPermission,
   createNotificationForUsers,
   getNotifications,
   markAsRead,

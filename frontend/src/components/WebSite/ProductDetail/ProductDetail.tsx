@@ -1189,10 +1189,16 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
       });
     if (product.hasVariants) out.push({ label: 'Variants', value: String(visibleVariants.length) });
     if (product.packagingType) {
+      const unpackedLabel = product.unpackedType === 'STITCHED' ? ' — Stitched'
+        : product.unpackedType === 'UNSTITCHED' ? ' — Unstitched'
+        : product.unpackedType === 'OTHER' ? ' — Other' : '';
       const packLabel = product.packagingType === 'PACKED'
         ? `Packed${product.packingType === 'BALE' ? ' — Bale pack' : product.packingType === 'CARTON' ? ' — Carton box' : ''}`
-        : 'Unpacked';
+        : `Unpacked${unpackedLabel}`;
       out.push({ label: 'Packaging', value: packLabel });
+      if (product.packagingType === 'UNPACKED' && product.unpackedNote) {
+        out.push({ label: 'Packaging Note', value: product.unpackedNote });
+      }
     }
     out.push({ label: 'Availability', value: availableStock > 0 ? `In stock (${availableStock})` : 'Out of stock' });
     out.push({

@@ -4,8 +4,38 @@ const { recomputeAndPersistOrderStatus } = require('../utils/computeOrderStatus'
 const { ACTIVE_ITEMS_FILTER } = require('../utils/activeItemsFilter');
 const { withWriteRetry } = require('../utils/dbRetry');
 const { creditWallet } = require('../utils/wallet');
+const creditPoints = require('../utils/creditPoints');
 
 const SETTLEMENT_DUE_DAYS = 30;
+
+/**
+ * Reverse an order's credit-points movements on cancel/return: refund points the
+ * customer redeemed and claw back any unspent points they earned. Idempotent via
+ * order.pointsReversedAt. Never throws.
+ */
+async function reverseOrderPoints(order, actor = {}) {
+    if (!order || !order.customerId) return;
+    if (order.pointsReversedAt) return; // already reversed
+    const redeemedPoints = order.pointsRedeemed || 0;
+    const earnedPoints = order.pointsEarned || 0;
+    if (redeemedPoints <= 0 && earnedPoints <= 0) return;
+    try {
+        await creditPoints.reverseOrderPoints({
+            customerId: order.customerId,
+            orderId: order.id,
+            orderCode: order.orderId,
+            redeemedPoints,
+            earnedPoints,
+            actor: { id: actor?.id, name: actor?.name || actor?.email || 'Admin', type: 'admin' },
+        });
+        await prisma.order.update({
+            where: { id: order.id },
+            data: { pointsReversedAt: new Date() },
+        }).catch(() => {});
+    } catch (e) {
+        console.warn('[reverseOrderPoints] failed:', e?.message || e);
+    }
+}
 
 /**
  * Refund an order to the customer's M2C Wallet as instant store credit — the only
@@ -788,6 +818,44 @@ const updateAdminOrderStatus = async (req, res) => {
             });
         });
 
+        // Earn credit points when the order reaches DELIVERED (refund-safe timing).
+        // Idempotent: skip if already earned. Eligible INR excludes the points-funded
+        // portion so redeemed points can't be farmed back into new points.
+        if (nextStatus === 'DELIVERED' && !order.pointsEarned) {
+            try {
+                const settings = await creditPoints.getSettings();
+                if (settings.enabled
+                    && settings.earnOn === 'DELIVERED'
+                    && creditPoints.isActiveForRegion(settings, order.currency)) {
+                    const totalInr = order.totalAmountINR != null ? order.totalAmountINR : order.totalAmount;
+                    const pointsValueInr = order.pointsRedeemedValueINR || 0;
+                    const eligibleInr = Math.max(0, (totalInr || 0) - pointsValueInr);
+                    const pts = creditPoints.computeEarnedPoints(eligibleInr, settings);
+                    if (pts > 0) {
+                        const expiresAt = settings.expiryDays > 0
+                            ? new Date(Date.now() + settings.expiryDays * 86400000)
+                            : null;
+                        await creditPoints.earnPoints({
+                            customerId: order.customerId,
+                            points: pts,
+                            source: 'ORDER_EARN',
+                            valueInr: pts * (settings.redeemValuePerPointInr || 0),
+                            description: `Points earned on order ${order.orderId}`,
+                            refs: { orderId: order.id, orderCode: order.orderId },
+                            actor: { id: req.user?.id, name: req.user?.name || 'System', type: 'system' },
+                            expiresAt,
+                        });
+                        await prisma.order.update({
+                            where: { id: order.id },
+                            data: { pointsEarned: pts, pointsEarnedAt: new Date() },
+                        }).catch(() => {});
+                    }
+                }
+            } catch (e) {
+                console.warn('[creditPoints earn] failed:', e?.message || e);
+            }
+        }
+
         // Approving a return (→ RETURNED): stop any vendor payout, mark the return
         // request approved, and issue the customer's refund automatically.
         if (status === 'RETURNED') {
@@ -797,6 +865,7 @@ const updateAdminOrderStatus = async (req, res) => {
                     data: { status: 'Cancelled' },
                 });
                 await refundOrderToWallet(order, req.user);
+                await reverseOrderPoints(order, req.user);
                 const prevReturn = order.returnRequest && typeof order.returnRequest === 'object' ? order.returnRequest : {};
                 await prisma.order.update({
                     where: { id: order.id },
@@ -818,6 +887,11 @@ const updateAdminOrderStatus = async (req, res) => {
             } catch (e) {
                 console.error('Cancel refund error:', e?.message || e);
             }
+        }
+        // Reverse credit-points on cancel (independent of wallet refund so it also
+        // covers COD/unpaid orders that redeemed points).
+        if (status === 'CANCELLED') {
+            await reverseOrderPoints(order, req.user);
         }
 
         // Send push notification to customer (fire-and-forget)
@@ -959,6 +1033,7 @@ const decideReturn = async (req, res) => {
         });
 
         await refundOrderToWallet(order, req.user);
+        await reverseOrderPoints(order, req.user);
         const updated = await prisma.order.update({
             where: { id: order.id },
             data: {

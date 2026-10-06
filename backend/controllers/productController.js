@@ -11,13 +11,17 @@ const { getCurrentExchangeRate } = require('./exchangeRateController');
 const { visibilityWhere, isVisibleInRegion, normalizeRegion } = require('../utils/regionVisibility');
 const { buildActiveOffer } = require('../utils/offers');
 
-// Normalize the packaging selection into { packagingType, packingType }.
+// Normalize the packaging selection into { packagingType, packingType, unpackedType, unpackedNote }.
 //  packagingType: 'PACKED' | 'UNPACKED' | null
 //  packingType:   'BALE' | 'CARTON' | null — only kept when PACKED.
-function normalizePackaging(packagingType, packingType) {
+//  unpackedType:  'STITCHED' | 'UNSTITCHED' | 'OTHER' | null — only kept when UNPACKED.
+//  unpackedNote:  free-text remark — only kept when UNPACKED.
+function normalizePackaging(packagingType, packingType, unpackedType, unpackedNote) {
   const pkg = ['PACKED', 'UNPACKED'].includes(packagingType) ? packagingType : null;
   const method = pkg === 'PACKED' && ['BALE', 'CARTON'].includes(packingType) ? packingType : null;
-  return { packagingType: pkg, packingType: method };
+  const uType = pkg === 'UNPACKED' && ['STITCHED', 'UNSTITCHED', 'OTHER'].includes(unpackedType) ? unpackedType : null;
+  const uNote = pkg === 'UNPACKED' && typeof unpackedNote === 'string' && unpackedNote.trim() ? unpackedNote.trim() : null;
+  return { packagingType: pkg, packingType: method, unpackedType: uType, unpackedNote: uNote };
 }
 
 /**
@@ -184,6 +188,8 @@ const createProduct = async (req, res) => {
       returnable,
       packagingType,
       packingType,
+      unpackedType,
+      unpackedNote,
 
       // Single Unit Pricing Configuration
       singleUnitSize,
@@ -345,7 +351,7 @@ const createProduct = async (req, res) => {
           // Return eligibility — defaults to true unless explicitly turned off.
           returnable: returnable === false || returnable === 'false' || returnable === 'no' ? false : true,
           // Packaging (packed/unpacked → bale/carton).
-          ...normalizePackaging(packagingType, packingType),
+          ...normalizePackaging(packagingType, packingType, unpackedType, unpackedNote),
 
           // Single Unit Pricing Configuration
           singleUnitSize: singleUnitSize || null,
@@ -821,7 +827,7 @@ const updateProduct = async (req, res) => {
           ...(updateData.returnable !== undefined && {
             returnable: !(updateData.returnable === false || updateData.returnable === 'false' || updateData.returnable === 'no')
           }),
-          ...(updateData.packagingType !== undefined && normalizePackaging(updateData.packagingType, updateData.packingType)),
+          ...(updateData.packagingType !== undefined && normalizePackaging(updateData.packagingType, updateData.packingType, updateData.unpackedType, updateData.unpackedNote)),
 
           // Single Unit Pricing Configuration
           ...(updateData.singleUnitSize !== undefined && { singleUnitSize: updateData.singleUnitSize }),
@@ -1809,6 +1815,8 @@ const createProductByAdmin = async (req, res) => {
       returnable,
       packagingType,
       packingType,
+      unpackedType,
+      unpackedNote,
       adminFixedPrice, // Admin can set their own price
       priceINR,
       priceUSD,
@@ -2011,7 +2019,7 @@ const createProductByAdmin = async (req, res) => {
           hsnCode: hsnCode ? String(hsnCode).trim() : null,
           // Return eligibility — defaults to true unless explicitly turned off.
           returnable: returnable === false || returnable === 'false' || returnable === 'no' ? false : true,
-          ...normalizePackaging(packagingType, packingType),
+          ...normalizePackaging(packagingType, packingType, unpackedType, unpackedNote),
           adminFixedPrice: numOrNull(adminFixedPrice),
           ...productPrices,
           priceVisibility: priceVisibility || 'BOTH',
@@ -2304,7 +2312,7 @@ const updateProductByAdmin = async (req, res) => {
         ...(updateData.returnable !== undefined && {
           returnable: !(updateData.returnable === false || updateData.returnable === 'false' || updateData.returnable === 'no')
         }),
-        ...(updateData.packagingType !== undefined && normalizePackaging(updateData.packagingType, updateData.packingType)),
+        ...(updateData.packagingType !== undefined && normalizePackaging(updateData.packagingType, updateData.packingType, updateData.unpackedType, updateData.unpackedNote)),
         ...(updateData.adminFixedPrice !== undefined && {
           adminFixedPrice: updateData.adminFixedPrice ? parseFloat(updateData.adminFixedPrice) : null
         }),
@@ -3298,6 +3306,8 @@ const getPublicProduct = async (req, res) => {
         returnable: true, // return eligibility — drives the "Easy return" badge + policy note
         packagingType: true, // 'PACKED' | 'UNPACKED'
         packingType: true, // 'BALE' | 'CARTON' (when packed)
+        unpackedType: true, // 'STITCHED' | 'UNSTITCHED' | 'OTHER' (when unpacked)
+        unpackedNote: true, // remark for the unpacked selection
         createdAt: true,
         updatedAt: true,
         inventory: {

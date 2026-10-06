@@ -42,6 +42,7 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
   const [formData, setFormData] = useState({
     name: '',
     description: '',
+    level: 10,
     selectedPermissions: [] as string[],
   })
   const [errors, setErrors] = useState<{ [key: string]: string }>({})
@@ -70,6 +71,7 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
       setFormData({
         name: role.name,
         description: role.description,
+        level: role.level ?? 10,
         selectedPermissions: role.permissions.map(p => p.name),
       })
     }
@@ -199,12 +201,14 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
         await roleService.updateRole(role.id, {
           name: formData.name,
           description: formData.description,
+          level: formData.level,
           permissions: formData.selectedPermissions,
         })
       } else {
         await roleService.createRole({
           name: formData.name,
           description: formData.description,
+          level: formData.level,
           permissions: formData.selectedPermissions,
         })
       }
@@ -311,6 +315,27 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                       <span>{errors.description}</span>
                     </div>
                   )}
+                </div>
+
+                <div>
+                  <label htmlFor="level" className="block text-sm font-medium text-slate-700 mb-2">
+                    Org Level
+                  </label>
+                  <input
+                    id="level"
+                    name="level"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={formData.level}
+                    onChange={(e) => setFormData(prev => ({ ...prev, level: Number.isFinite(parseInt(e.target.value, 10)) ? parseInt(e.target.value, 10) : 0 }))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
+                    placeholder="10"
+                    disabled={isLoading}
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    Rank used for approval routing &amp; escalation — higher approves lower. Guide: Staff 10, Team Lead 20, Manager 30, Director 40, Admin 50+.
+                  </p>
                 </div>
               </div>
             </CardContent>

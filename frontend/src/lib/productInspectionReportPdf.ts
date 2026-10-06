@@ -335,13 +335,24 @@ export function generateProductInspectionPdf(
     sectionTitle("E. Packaging Inspection")
     // Packaging mode (from the vendor's product): drives which sections apply.
     const pkgMode = String((formData as any).packagingType || "").toUpperCase()
+    const unpackedTypeUP = String((formData as any).unpackedType || "").toUpperCase()
+    const unpackedTypeLabel = unpackedTypeUP === "STITCHED" ? "Stitched"
+        : unpackedTypeUP === "UNSTITCHED" ? "Unstitched"
+        : unpackedTypeUP === "OTHER" ? "Other" : ""
     const packLabel = pkgMode === "PACKED"
         ? `Packed${(formData as any).packingType ? ` — ${String((formData as any).packingType).toUpperCase() === "BALE" ? "Bale pack" : "Carton box"}` : ""}`
-        : pkgMode === "UNPACKED" ? "Unpacked" : null
+        : pkgMode === "UNPACKED" ? `Unpacked${unpackedTypeLabel ? ` — ${unpackedTypeLabel}` : ""}` : null
     if (packLabel) {
         ensureSpace(30)
         doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...SLATE)
         doc.text(`Packaging Mode: ${packLabel}`, margin, y); y += 14
+        const unpackedNoteUP = String((formData as any).unpackedNote || "").trim()
+        if (pkgMode === "UNPACKED" && unpackedNoteUP) {
+            doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...SLATE)
+            const noteLines = doc.splitTextToSize(`Packaging Note: ${unpackedNoteUP}`, contentW)
+            ensureSpace(noteLines.length * 12 + 4)
+            doc.text(noteLines, margin, y); y += noteLines.length * 12 + 2
+        }
         if (pkgMode === "UNPACKED") {
             doc.setFont("helvetica", "italic"); doc.setTextColor(...MUTED)
             doc.text(

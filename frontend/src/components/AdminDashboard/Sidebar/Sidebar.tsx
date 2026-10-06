@@ -30,6 +30,7 @@ import {
   ShoppingBag,
   RefreshCcw,
   BookOpen,
+  ShieldCheck,
 } from "lucide-react";
 
 interface SubMenuItem {
@@ -64,6 +65,24 @@ const navigation: NavigationItem[] = [
     href: "/admin/dashboard",
   },
 
+  // ── My Tasks (workflow-engine task inbox) — hidden: the maker-checker
+  //    "Approvals" inbox below covers the current single-step approval needs.
+  //    Re-enable by restoring this entry if the multi-stage Workflow engine is used.
+  // {
+  //   title: "My Tasks",
+  //   icon: Inbox,
+  //   href: "/admin/dashboard/my-tasks",
+  //   permission: "my_tasks:view",
+  // },
+
+  // ── Approvals — maker-checker inbox (visible to anyone who can approve a module)
+  {
+    title: "Approvals",
+    icon: ShieldCheck,
+    href: "/admin/dashboard/approvals",
+    permission: ["coupons:approve", "settlement:approve", "points:approve"],
+  },
+
   // ── 2. Vendors ────────────────────────────────────────────────────────────
   {
     title: "Vendors",
@@ -87,6 +106,7 @@ const navigation: NavigationItem[] = [
       { title: "Hub to Customer", href: "/admin/dashboard/orders/hub-to-customer", permission: "hub_to_customer:view" },
       { title: "Returns & Replacements", href: "/admin/dashboard/customers/returns", permission: "returns:view" },
       { title: "Customer Wallets", href: "/admin/dashboard/customers/wallets", permission: "wallet:view" },
+      { title: "Credit Points", href: "/admin/dashboard/customers/points", permission: "points:view" },
       { title: "Invoices", href: "/admin/dashboard/billing/invoices", permission: "invoices:view" },
       { title: "Customer Reviews", href: "/admin/dashboard/reviews/customer", permission: "customer_reviews:view" },
     ],
@@ -141,6 +161,11 @@ const navigation: NavigationItem[] = [
         subItems: [
           { title: "User Management", href: "/admin/dashboard/users/user-management", permission: "staff_management:view" },
           { title: "Roles & Permissions", href: "/admin/dashboard/roles-permissions", permission: "roles_permissions:view" },
+          { title: "Organization", href: "/admin/dashboard/organization", permission: "organization:view" },
+          // Workflow engine (multi-stage, configurable) — hidden for now; the
+          // maker-checker "Approvals" inbox covers current needs. Re-enable if a
+          // process ever needs 3+ sequential, client-configurable stages.
+          // { title: "Workflows", href: "/admin/dashboard/workflows", permission: "workflows:view" },
         ],
       },
       {

@@ -175,6 +175,8 @@ interface ProductFormData {
   returnable?: boolean // Whether customers can return this product (within 7 days of delivery)
   packagingType?: 'PACKED' | 'UNPACKED' | '' // How the product ships
   packingType?: 'BALE' | 'CARTON' | '' // Pack style when PACKED
+  unpackedType?: 'STITCHED' | 'UNSTITCHED' | 'OTHER' | '' // Unpacked style
+  unpackedNote?: string // Remark for the unpacked selection
   adminFixedPrice?: number | null
   priceINR?: number | null
   priceUSD?: number | null
@@ -317,6 +319,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
     returnable: true,
     packagingType: '',
     packingType: '',
+    unpackedType: '',
+    unpackedNote: '',
     adminFixedPrice: null,
     priceINR: null,
     priceUSD: null,
@@ -660,6 +664,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
               returnable: product.returnable !== false,
               packagingType: (product.packagingType as 'PACKED' | 'UNPACKED' | undefined) || '',
               packingType: (product.packingType as 'BALE' | 'CARTON' | undefined) || '',
+              unpackedType: ((product as any).unpackedType as 'STITCHED' | 'UNSTITCHED' | 'OTHER' | undefined) || '',
+              unpackedNote: ((product as any).unpackedNote as string | undefined) || '',
               adminFixedPrice: product.adminFixedPrice || null,
               priceINR: product.priceINR || null,
               priceUSD: product.priceUSD || null,
@@ -1857,6 +1863,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                           packagingType: value as 'PACKED' | 'UNPACKED' | '',
                           // Clear the pack style when not packed.
                           packingType: value === 'PACKED' ? prev.packingType : '',
+                          // Clear the unpacked fields when not unpacked.
+                          unpackedType: value === 'UNPACKED' ? prev.unpackedType : '',
+                          unpackedNote: value === 'UNPACKED' ? prev.unpackedNote : '',
                         }))}
                       />
                       <p className="text-xs text-slate-500 mt-1">Is this product shipped packed or unpacked?</p>
@@ -1878,6 +1887,39 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                         onChange={(value) => setFormData(prev => ({ ...prev, packingType: value as 'BALE' | 'CARTON' | '' }))}
                       />
                       <p className="text-xs text-slate-500 mt-1">How is the packed product bundled?</p>
+                    </div>
+                    )}
+                    {formData.packagingType === 'UNPACKED' && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Unpacked Type
+                      </label>
+                      <Dropdown
+                        label=""
+                        value={formData.unpackedType || ''}
+                        options={[
+                          { value: '', label: 'Select type…' },
+                          { value: 'STITCHED', label: 'Stitched' },
+                          { value: 'UNSTITCHED', label: 'Unstitched' },
+                          { value: 'OTHER', label: 'Other' },
+                        ]}
+                        placeholder="Select type…"
+                        onChange={(value) => setFormData(prev => ({ ...prev, unpackedType: value as 'STITCHED' | 'UNSTITCHED' | 'OTHER' | '' }))}
+                      />
+                      <p className="text-xs text-slate-500 mt-1">Is the unpacked product stitched, unstitched or other?</p>
+                      <div className="mt-3">
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          Note / Remarks
+                        </label>
+                        <textarea
+                          name="unpackedNote"
+                          value={formData.unpackedNote || ''}
+                          onChange={handleInputChange}
+                          rows={2}
+                          className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
+                          placeholder="Add any remarks about the unpacked product…"
+                        />
+                      </div>
                     </div>
                     )}
                     <div>

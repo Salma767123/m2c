@@ -2,6 +2,7 @@ const { prisma } = require('../config/database');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { sendTemplatedEmail } = require('../utils/emailTemplateRenderer');
+const { resolveBase64InValue } = require('../config/cloudinary');
 
 // ==========================================
 // CUSTOMER MANAGEMENT
@@ -397,6 +398,11 @@ exports.getStaffById = async (req, res) => {
             select: {
                 id: true,
                 name: true,
+                title: true,
+                firstName: true,
+                middleName: true,
+                lastName: true,
+                designation: true,
                 email: true,
                 phoneNumber: true,
                 isActive: true,
@@ -426,10 +432,15 @@ exports.getStaffById = async (req, res) => {
             success: true,
             data: {
                 id: s.id,
-                firstName: s.name.split(' ')[0] || '',
-                lastName: s.name.split(' ').slice(1).join(' ') || '',
+                title: s.title || '',
+                // Prefer the structured columns; fall back to splitting `name` for
+                // older records that predate the separate fields.
+                firstName: s.firstName || s.name.split(' ')[0] || '',
+                middleName: s.middleName || '',
+                lastName: s.lastName || s.name.split(' ').slice(1).join(' ') || '',
+                designation: s.designation || '',
                 email: s.email,
-                phone: s.phoneNumber || 'N/A',
+                phone: s.phoneNumber || '',
                 role: s.role ? s.role.name : 'Unknown',
                 roleId: s.role ? s.role.id : null,
                 permissions: s.role ? s.role.permissions : [],
@@ -469,7 +480,10 @@ const generateSimplePassword = (email) => {
 
 exports.createStaff = async (req, res) => {
     try {
-        const { firstName, lastName, email, phone, roleId, password } = req.body;
+        const {
+            title, firstName, middleName, lastName, designation,
+            email, phone, roleId, password, image,
+        } = req.body;
 
         // Role is required — creating staff without a role would lock them out of every
         // permission-protected route, which is a broken state.
@@ -503,9 +517,26 @@ exports.createStaff = async (req, res) => {
         // Verification token — staff must verify their email before they can log in.
         const verificationToken = crypto.randomBytes(32).toString('hex');
 
+        // `name` stays First + Last (title/middle are separate columns, composed
+        // for display by fullDisplayName()).
+        const displayName = [firstName, lastName].filter(Boolean).join(' ').trim();
+
+        // Profile photo: accept a base64 data URL and push it to Cloudinary.
+        let resolvedImage = null;
+        if (image) {
+            try { resolvedImage = await resolveBase64InValue(image, { folder: 'admin-profiles' }); }
+            catch (e) { console.error('Staff photo upload failed:', e.message); }
+        }
+
         const newStaff = await prisma.admin.create({
             data: {
-                name: `${firstName} ${lastName}`,
+                name: displayName,
+                title: title || null,
+                firstName: firstName || null,
+                middleName: middleName || null,
+                lastName: lastName || null,
+                designation: designation || null,
+                image: resolvedImage,
                 email,
                 phoneNumber: phone,
                 roleId,
@@ -570,19 +601,43 @@ exports.updateStaffStatus = async (req, res) => {
 exports.updateStaff = async (req, res) => {
     try {
         const { id } = req.params;
-        const { firstName, lastName, email, phone, roleId } = req.body;
+        const {
+            title, firstName, middleName, lastName, designation,
+            email, phone, roleId, image,
+        } = req.body;
 
-        const updatedStaff = await prisma.admin.update({
-            where: { id },
-            data: {
-                firstName,
-                lastName,
-                email,
-                phone,
-                roleId
+        const existing = await prisma.admin.findUnique({ where: { id } });
+        if (!existing) return res.status(404).json({ success: false, error: 'Staff member not found' });
+
+        // Recompute the display name from the (possibly updated) parts.
+        const nextFirst = firstName !== undefined ? firstName : existing.firstName;
+        const nextLast = lastName !== undefined ? lastName : existing.lastName;
+        const displayName = [nextFirst, nextLast].filter(Boolean).join(' ').trim() || existing.name;
+
+        const data = {
+            name: displayName,
+            ...(title !== undefined && { title: title || null }),
+            ...(firstName !== undefined && { firstName: firstName || null }),
+            ...(middleName !== undefined && { middleName: middleName || null }),
+            ...(lastName !== undefined && { lastName: lastName || null }),
+            ...(designation !== undefined && { designation: designation || null }),
+            ...(email !== undefined && { email }),
+            ...(phone !== undefined && { phoneNumber: phone }),
+            ...(roleId !== undefined && { roleId }),
+        };
+
+        // Profile photo: only touch it when a value was sent. A base64 data URL is
+        // uploaded; an http(s) URL is kept as-is; empty string clears it.
+        if (image !== undefined) {
+            if (image && image.startsWith('data:')) {
+                try { data.image = await resolveBase64InValue(image, { folder: 'admin-profiles' }); }
+                catch (e) { console.error('Staff photo upload failed:', e.message); }
+            } else {
+                data.image = image || null;
             }
-        });
+        }
 
+        const updatedStaff = await prisma.admin.update({ where: { id }, data });
         res.json({ success: true, data: updatedStaff });
     } catch (error) {
         console.error('Error updating staff:', error);

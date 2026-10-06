@@ -62,7 +62,9 @@ const defaultRoles = [
     {
         name: 'Manager',
         description: 'Management access for products and orders',
-        isSystem: true,
+        // Editable role: admins can tune the Manager permission set (unlike the
+        // protected Super Admin / Admin system roles).
+        isSystem: false,
         permissions: [
             'all_products:view', 'all_products:create', 'all_products:edit', 'all_products:approve',
             'vendor_product_requests:view',
@@ -102,7 +104,9 @@ async function main() {
             update: {
                 permissions: roleData.permissions,
                 description: roleData.description,
-                isSystem: true
+                // Respect each role's own flag so editable roles (Manager) aren't
+                // re-locked on re-seed.
+                isSystem: roleData.isSystem === true
             },
             create: roleData
         });

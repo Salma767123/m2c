@@ -81,6 +81,8 @@ const getStatusBadge = (status: string) => {
       return <Badge className="bg-amber-50 text-amber-700 border border-amber-200 font-bold">Pending</Badge>;
     case "UNDER_REVIEW":
       return <Badge className="bg-blue-50 text-blue-700 border border-blue-200 font-bold">Under Review</Badge>;
+    case "REVIEWED":
+      return <Badge className="bg-teal-50 text-teal-700 border border-teal-200 font-bold">Reviewed &amp; Qualified</Badge>;
     case "APPROVAL_PENDING":
       return <Badge className="bg-teal-50 text-teal-700 border border-teal-200 font-bold">Approval Pending</Badge>;
     case "REJECTION_PENDING":

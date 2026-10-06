@@ -67,6 +67,10 @@ interface Props {
   formData: {
     packagingItems: PackagingItem[]
     packagingPhotos: any[]
+    packagingType?: string
+    packingType?: string
+    unpackedType?: string
+    unpackedNote?: string
   }
   setFormData: (d: any) => void
   errors?: Record<string, string>
@@ -256,6 +260,21 @@ export default function PI_Step3_PackagingInspection({ formData, setFormData, er
           For each packaging item, mark whether it was inspected. If yes, select a remark code —
           codes 1–7 require remarks describing the findings.
         </p>
+        {/* Vendor-declared packaging context — read-only, carried from the product. */}
+        {formData.packagingType && (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
+              Packaging: {formData.packagingType === 'PACKED'
+                ? `Packed${formData.packingType === 'BALE' ? ' · Bale' : formData.packingType === 'CARTON' ? ' · Carton' : ''}`
+                : `Unpacked${formData.unpackedType === 'STITCHED' ? ' · Stitched' : formData.unpackedType === 'UNSTITCHED' ? ' · Unstitched' : formData.unpackedType === 'OTHER' ? ' · Other' : ''}`}
+            </span>
+            {formData.packagingType === 'UNPACKED' && formData.unpackedNote && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800">
+                Note: {formData.unpackedNote}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {errors.packagingItems && (

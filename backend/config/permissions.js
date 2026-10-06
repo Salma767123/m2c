@@ -26,7 +26,8 @@ const PERMISSION_MODULES = [
                 description: 'Vendor list, onboarding and profile edits',
                 actions: { view: true, create: true, edit: true, delete: false },
                 extra: [
-                    { key: 'approve', label: 'Approve / Reject', description: 'Approve or reject vendor registrations (incl. confirm / cancel)' },
+                    { key: 'review', label: 'Review Registration', description: 'Review a vendor registration form: mark Reviewed & Qualified or propose rejection' },
+                    { key: 'approve', label: 'Approve / Reject', description: 'Approve or reject vendor registrations (incl. confirm / cancel the final rejection)' },
                     { key: 'suspend', label: 'Suspend', description: 'Suspend an approved vendor' },
                 ],
             },
@@ -62,6 +63,7 @@ const PERMISSION_MODULES = [
                 description: 'Vendor payouts',
                 actions: { view: true, create: false, edit: false, delete: false },
                 extra: [
+                    { key: 'approve', label: 'Approve / Reject', description: 'Approve or reject a settlement before it can be paid out' },
                     { key: 'mark_paid', label: 'Mark as Paid', description: 'Record a settlement payment with transaction ID' },
                     { key: 'set_due_date', label: 'Set Due Date', description: 'Set or change a settlement due date' },
                 ],
@@ -113,6 +115,16 @@ const PERMISSION_MODULES = [
                 actions: { view: true, create: false, edit: false, delete: false },
                 extra: [
                     { key: 'adjust', label: 'Adjust Balance', description: 'Manually credit or debit a customer wallet (with a reason)' },
+                ],
+            },
+            {
+                key: 'points',
+                name: 'Customer Credit Points',
+                description: 'Customer loyalty credit-points balances and history',
+                actions: { view: true, create: false, edit: false, delete: false },
+                extra: [
+                    { key: 'adjust', label: 'Adjust Points', description: 'Manually add or deduct a customer\'s credit points (with a reason)' },
+                    { key: 'approve', label: 'Approve / Reject', description: 'Approve or reject credit-points program settings changes before they take effect' },
                 ],
             },
             {
@@ -194,7 +206,9 @@ const PERMISSION_MODULES = [
                 name: 'Coupons',
                 description: 'Coupons and free-shipping offers',
                 actions: { view: true, create: true, edit: true, delete: true },
-                extra: [],
+                extra: [
+                    { key: 'approve', label: 'Approve / Reject', description: 'Approve or reject newly created coupons and offers before they go live' },
+                ],
             },
             {
                 key: 'staff_management',
@@ -211,6 +225,34 @@ const PERMISSION_MODULES = [
                 description: 'Roles and their permission sets',
                 actions: { view: true, create: true, edit: true, delete: true },
                 extra: [],
+            },
+            {
+                key: 'organization',
+                name: 'Organization',
+                description: 'Departments, teams, reporting structure and role assignments',
+                actions: { view: true, create: true, edit: true, delete: true },
+                extra: [
+                    { key: 'assign_roles', label: 'Assign Roles', description: 'Place people into departments/teams and assign their scoped role' },
+                ],
+            },
+            {
+                key: 'workflows',
+                name: 'Workflows',
+                description: 'Design and manage multi-stage approval workflows',
+                actions: { view: true, create: true, edit: true, delete: true },
+                extra: [
+                    { key: 'start', label: 'Start Workflow', description: 'Manually start a workflow instance for a subject' },
+                    { key: 'cancel', label: 'Cancel Workflow', description: 'Cancel a running workflow instance' },
+                ],
+            },
+            {
+                key: 'my_tasks',
+                name: 'My Tasks',
+                description: 'Personal approval inbox: act on assigned workflow tasks',
+                actions: { view: true, create: false, edit: false, delete: false },
+                extra: [
+                    { key: 'act', label: 'Act on Tasks', description: 'Approve / reject / assign on tasks in your inbox' },
+                ],
             },
             {
                 key: 'analytics',

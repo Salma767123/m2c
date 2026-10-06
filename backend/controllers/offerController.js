@@ -170,10 +170,15 @@ const createOffer = async (req, res) => {
     const built = buildOfferData(req.body);
     if (built.error) return res.status(400).json({ success: false, message: built.error });
     built.data.bannerImage = await resolveBanner(req.body.bannerImage);
+    // Maker-checker: a new offer is held PENDING and won't apply until approved.
+    Object.assign(built.data, require('../utils/approvals').submissionData({ id: req.user?.id, name: req.user?.name || req.user?.email }));
     const offer = await prisma.offer.create({ data: built.data });
 
-    // Notify targeted customers about their exclusive offer.
-    if (Array.isArray(offer.targetCustomerIds) && offer.targetCustomerIds.length > 0) {
+    // Ping the authorised approver(s) that an offer is waiting for approval.
+    require('../utils/approvals').notifyApprovers({ module: 'offer', entityLabel: offer.title, submittedByName: req.user?.name || req.user?.email });
+
+    // Notify targeted customers only once the offer is actually live (approved).
+    if (offer.approvalStatus === 'APPROVED' && Array.isArray(offer.targetCustomerIds) && offer.targetCustomerIds.length > 0) {
       try {
         const { createNotification } = require('./notificationController');
         await Promise.all(offer.targetCustomerIds.map((uid) => createNotification({

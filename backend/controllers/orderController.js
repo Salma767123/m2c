@@ -47,6 +47,7 @@ const { withRetry } = require('../utils/dbRetry');
 const { resolveUsdRate, toINR, resolveUnitPrice } = require('../utils/orderCurrency');
 const { evaluateCoupon } = require('../utils/couponPricing');
 const { calculateLogistics, convertShippingToOrderCurrency, qualifiesForFreeShipping } = require('../utils/logistics');
+const { resolveDeliveryZone, getShippingGstPct } = require('../utils/deliveryZone');
 const { isVisibleInRegion, normalizeRegion } = require('../utils/regionVisibility');
 const { isIntrastate, splitLineTax } = require('../utils/gst');
 const { isCourierAvailable } = require('../utils/couriers');
@@ -653,11 +654,31 @@ const createOrder = async (req, res) => {
             couponGrantsFreeShipping,
             region: currency, // 'INR'|'USD' — normalized inside isVisibleInRegion
         });
-        const roundedShipping = freeShipping
-            ? 0
-            : Math.max(0, convertShippingToOrderCurrency(
-                computedShippingInr, currency, orderExchangeRate
-            ));
+        // ── Delivery zone: destination availability + flat fee + shipping GST ──
+        // Block the order when the destination isn't covered by any active zone,
+        // then add the zone's flat fee on top of the weight-based rate and apply
+        // the global shipping GST. All dynamic — nothing hardcoded.
+        const deliveryZone = await resolveDeliveryZone({
+            country: shippingAddress?.country,
+            state: shippingAddress?.state,
+            city: shippingAddress?.city,
+        });
+        if (!deliveryZone) {
+            return res.status(400).json({
+                success: false,
+                error: 'Delivery is not available to this location. Please choose a different delivery address.',
+            });
+        }
+        const shippingGstPct = await getShippingGstPct();
+        const zoneFeeInr = freeShipping ? 0 : (Number(deliveryZone.flatFee) || 0);
+        // Shipping base (INR) = weight-based rate + zone flat fee (0 when free).
+        const shippingBaseInr = freeShipping ? 0 : round2(computedShippingInr + zoneFeeInr);
+        const shippingTaxInr = round2(shippingBaseInr * shippingGstPct / 100);
+
+        const roundedShipping = Math.max(0, convertShippingToOrderCurrency(shippingBaseInr, currency, orderExchangeRate));
+        const roundedShippingTax = Math.max(0, convertShippingToOrderCurrency(shippingTaxInr, currency, orderExchangeRate));
+        const deliveryFlatFeeOrderCcy = Math.max(0, convertShippingToOrderCurrency(zoneFeeInr, currency, orderExchangeRate));
+
         const clientShipping = round2(Number(shippingCost) || 0);
         if (Math.abs(clientShipping - roundedShipping) > 0.01) {
             console.warn(
@@ -667,9 +688,10 @@ const createOrder = async (req, res) => {
         }
 
         // Clamp at zero. A discount larger than the goods value must never produce a
-        // negative order that would read as money owed to the customer.
+        // negative order that would read as money owed to the customer. Shipping tax
+        // is added on top of the (product) tax and shipping.
         const totalAmount = Math.max(0, round2(
-            roundedSubtotal + roundedShipping + roundedTax - roundedDiscount
+            roundedSubtotal + roundedShipping + roundedShippingTax + roundedTax - roundedDiscount
         ));
 
         // ── Wallet redemption (store credit) ─────────────────────────────────
@@ -691,8 +713,45 @@ const createOrder = async (req, res) => {
             walletAppliedINR = currency === 'USD' ? round2(walletApplied * orderExchangeRate) : walletApplied;
             if (walletAppliedINR > balanceINR) walletAppliedINR = round2(balanceINR);
         }
-        // Net still payable via gateway after wallet.
-        const netPayable = Math.max(0, round2(totalAmount - walletApplied));
+        // ── Credit points redemption ─────────────────────────────────────────
+        // Points are an INR-denominated tender applied AFTER wallet (and after the
+        // invoice total is final). Capped by: admin max-redeem % of the order, the
+        // customer's points balance, the min-points-to-redeem floor, and whatever
+        // value remains after the wallet credit. Value = points × redeemValuePerPointInr.
+        let pointsRedeemed = 0;          // whole points spent
+        let pointsRedeemedValue = 0;     // order currency
+        let pointsRedeemedValueINR = 0;  // INR twin (what the ledger records)
+        const requestedPoints = Math.max(0, Math.floor(Number(req.body?.pointsRedeemed) || 0));
+        if (requestedPoints > 0) {
+            const creditPoints = require('../utils/creditPoints');
+            const cpSettings = await creditPoints.getSettings();
+            if (cpSettings.enabled && creditPoints.isActiveForRegion(cpSettings, currency)) {
+                const perPointInr = Number(cpSettings.redeemValuePerPointInr) || 0;
+                const balancePts = await creditPoints.getBalance(userId);
+                const totalAmountINRCalc = currency === 'USD' ? round2(totalAmount * orderExchangeRate) : totalAmount;
+                const walletedINR = walletAppliedINR || 0;
+                if (perPointInr > 0 && balancePts > 0) {
+                    // INR headroom: min(max-redeem % of order, amount left after wallet).
+                    const maxByPercentINR = round2(totalAmountINRCalc * (Number(cpSettings.maxRedeemPercent) || 0) / 100);
+                    const remainingINR = Math.max(0, round2(totalAmountINRCalc - walletedINR));
+                    const headroomINR = Math.min(maxByPercentINR, remainingINR);
+                    const maxPointsByValue = Math.floor(headroomINR / perPointInr);
+                    let pts = Math.min(requestedPoints, balancePts, maxPointsByValue);
+                    // Enforce the min-to-redeem floor: below it, redeem nothing.
+                    if (pts < (Number(cpSettings.minPointsToRedeem) || 0)) pts = 0;
+                    if (pts > 0) {
+                        pointsRedeemed = pts;
+                        pointsRedeemedValueINR = round2(pts * perPointInr);
+                        pointsRedeemedValue = currency === 'USD'
+                            ? round2(orderExchangeRate ? pointsRedeemedValueINR / orderExchangeRate : 0)
+                            : pointsRedeemedValueINR;
+                    }
+                }
+            }
+        }
+
+        // Net still payable via gateway after wallet + points.
+        const netPayable = Math.max(0, round2(totalAmount - walletApplied - pointsRedeemedValue));
 
         // A pure-wallet order must be fully covered by the balance.
         if (paymentMethod === 'WALLET' && netPayable > 0.009) {
@@ -832,6 +891,12 @@ const createOrder = async (req, res) => {
                     // reconciles against totalAmount.
                     subtotal: roundedSubtotal,
                     shippingCost: roundedShipping,
+                    // Delivery zone + shipping tax (destination-based).
+                    deliveryZoneId: deliveryZone.id,
+                    deliveryZoneName: deliveryZone.name,
+                    deliveryFlatFee: deliveryFlatFeeOrderCcy,
+                    shippingTax: roundedShippingTax,
+                    shippingTaxINR: shippingTaxInr,
                     tax: roundedTax,
                     // GST split (display) — total stays `tax`. Intrastate =>
                     // cgst+sgst, interstate => igst. All 0 / null when no GST.
@@ -852,6 +917,10 @@ const createOrder = async (req, res) => {
                     // Wallet tender (order currency) + INR twin + what the gateway was charged.
                     walletApplied,
                     walletAppliedINR: round2(walletAppliedINR),
+                    // Credit-points tender (order currency) + INR twin + points spent.
+                    pointsRedeemed,
+                    pointsRedeemedValue: round2(pointsRedeemedValue),
+                    pointsRedeemedValueINR: round2(pointsRedeemedValueINR),
                     amountPaid: netPayable,
                     paymentStatus: paymentMethod === 'COD' ? 'PENDING' : 'PAID',
                     paymentMethod,
@@ -907,6 +976,22 @@ const createOrder = async (req, res) => {
                     amount: walletAppliedINR,
                     source: 'ORDER_REDEMPTION',
                     description: `Applied to order ${orderDisplayId}`,
+                    refs: { orderId: newOrder.id, orderCode: orderDisplayId },
+                    actor: { id: userId, name: user.name, type: 'customer' },
+                }, tx);
+            }
+
+            // Debit credit points inside the transaction (mirrors the wallet debit) —
+            // a rollback also reverses the points spend. redeemPoints re-reads the
+            // balance and throws POINTS_INSUFFICIENT if it can't cover the spend.
+            if (pointsRedeemed > 0) {
+                const creditPoints = require('../utils/creditPoints');
+                await creditPoints.redeemPoints({
+                    customerId: userId,
+                    points: pointsRedeemed,
+                    source: 'ORDER_REDEMPTION',
+                    valueInr: pointsRedeemedValueINR,
+                    description: `Redeemed on order ${orderDisplayId}`,
                     refs: { orderId: newOrder.id, orderCode: orderDisplayId },
                     actor: { id: userId, name: user.name, type: 'customer' },
                 }, tx);
@@ -1035,6 +1120,8 @@ const createOrder = async (req, res) => {
                     amount: round2(baseAmount + taxAmount),
                     status: 'Pending',
                     dueDate: null,
+                    // Maker-checker: a settlement must be approved before it can be paid out.
+                    approvalStatus: 'PENDING',
                 });
             }
 
@@ -1456,6 +1543,22 @@ const cancelMyOrder = async (req, res) => {
             });
         } else {
             updated = order;
+        }
+
+        // Reverse credit points: refund any redeemed, claw back any earned.
+        if (!order.pointsReversedAt && ((order.pointsRedeemed || 0) > 0 || (order.pointsEarned || 0) > 0)) {
+            try {
+                const creditPoints = require('../utils/creditPoints');
+                await creditPoints.reverseOrderPoints({
+                    customerId: order.customerId,
+                    orderId: order.id,
+                    orderCode: order.orderId,
+                    redeemedPoints: order.pointsRedeemed || 0,
+                    earnedPoints: order.pointsEarned || 0,
+                    actor: { id: userId, name: 'Customer', type: 'customer' },
+                });
+                await prisma.order.update({ where: { id: order.id }, data: { pointsReversedAt: new Date() } }).catch(() => {});
+            } catch (e) { console.warn('[cancel] points reversal failed:', e?.message); }
         }
 
         // Notify vendors so they stop processing.
