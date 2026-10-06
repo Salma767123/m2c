@@ -42,6 +42,8 @@ export interface Role {
     name: string;
     description: string;
     permissions: Permission[];
+    /** Org rank for approval routing/escalation (Staff=10, TL=20, Manager=30, Director=40…). */
+    level?: number;
     userCount: number;
     isSystem: boolean;
     createdAt: string;
@@ -59,12 +61,12 @@ export const roleService = {
         return response.data;
     },
 
-    createRole: async (data: { name: string; description: string; permissions: string[] }): Promise<{ success: boolean; data: Role }> => {
+    createRole: async (data: { name: string; description: string; permissions: string[]; level?: number }): Promise<{ success: boolean; data: Role }> => {
         const response = await axiosInstance.post('/roles', data);
         return response.data;
     },
 
-    updateRole: async (id: string, data: { name?: string; description?: string; permissions?: string[] }): Promise<{ success: boolean; data: Role }> => {
+    updateRole: async (id: string, data: { name?: string; description?: string; permissions?: string[]; level?: number }): Promise<{ success: boolean; data: Role }> => {
         const response = await axiosInstance.put(`/roles/${id}`, data);
         return response.data;
     },

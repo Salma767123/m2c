@@ -14,7 +14,7 @@ async function buildInvoicePdfBuffer(order, company = {}) {
     customerName, customerEmail, customerPhone,
     shippingAddress = {},
     items = [],
-    subtotal = 0, shippingCost = 0, tax = 0,
+    subtotal = 0, shippingCost = 0, shippingTax = 0, tax = 0,
     cgstAmount = 0, sgstAmount = 0, igstAmount = 0, taxType = null,
     discount = 0, totalAmount = 0,
     paymentMethod, paymentStatus,
@@ -157,6 +157,7 @@ async function buildInvoicePdfBuffer(order, company = {}) {
   else if (isTax && igstAmount > 0) row('IGST', fmt(igstAmount));
   else if (tax > 0) row('Tax (GST)', fmt(tax));
   row('Shipping', shippingCost > 0 ? fmt(shippingCost) : 'Free');
+  if (shippingTax > 0) row('Shipping GST', fmt(shippingTax));
   doc.moveTo(tX, y).lineTo(R, y).strokeColor(DARK).lineWidth(1).stroke(); y += 8;
   row('Grand Total', fmt(totalAmount), true);
 

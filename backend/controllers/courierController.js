@@ -11,7 +11,9 @@
 
 const { prisma } = require('../config/database');
 
-const REGIONS = ['IN', 'US'];
+// 'BOTH' = a courier that serves both the domestic (.in) and international (.com)
+// storefronts; it is listed under, and matched by, both region queries.
+const REGIONS = ['IN', 'US', 'BOTH'];
 const MODES = ['AIR', 'SHIP'];
 
 function buildCourierData(body) {
@@ -94,7 +96,9 @@ const getActiveCouriers = async (req, res) => {
   try {
     const { region, mode } = req.query;
     const where = { isActive: true };
-    if (REGIONS.includes(region)) where.region = region;
+    // A storefront region query (IN / US) must also surface couriers tagged BOTH.
+    if (region === 'IN' || region === 'US') where.region = { in: [region, 'BOTH'] };
+    else if (region === 'BOTH') where.region = 'BOTH';
     if (MODES.includes(mode)) where.modes = { has: mode };
     const couriers = await prisma.courier.findMany({ where, orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] });
     res.json({ success: true, data: couriers });

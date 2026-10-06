@@ -170,6 +170,8 @@ interface ProductFormData {
   returnable?: boolean
   packagingType?: 'PACKED' | 'UNPACKED' | '' // How the product ships
   packingType?: 'BALE' | 'CARTON' | '' // Pack style when packed
+  unpackedType?: 'STITCHED' | 'UNSTITCHED' | 'OTHER' | '' // Unpacked style
+  unpackedNote?: string // Remark for the unpacked selection
 
   // Basic Product Info - Size & Color
   singleUnitSize?: string
@@ -270,6 +272,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     returnable: true,
     packagingType: '',
     packingType: '',
+    unpackedType: '',
+    unpackedNote: '',
 
     // Basic Product Info - Size & Color
     singleUnitSize: '',
@@ -387,6 +391,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     category: 'basic',
     subCategory: 'basic',
     coverImage: 'basic',
+    unpackedType: 'basic',
+    unpackedNote: 'basic',
     fabricType: 'fabric',
     otherFabricType: 'fabric',
     careInstructions: 'fabric',
@@ -681,6 +687,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
               returnable: (product as any).returnable !== false,
               packagingType: ((product as any).packagingType as 'PACKED' | 'UNPACKED' | undefined) || '',
               packingType: ((product as any).packingType as 'BALE' | 'CARTON' | undefined) || '',
+              unpackedType: ((product as any).unpackedType as 'STITCHED' | 'UNSTITCHED' | 'OTHER' | undefined) || '',
+              unpackedNote: ((product as any).unpackedNote as string | undefined) || '',
 
               // Basic Product Info - Size & Color
               singleUnitSize: (product as any).singleUnitSize || '',
@@ -1255,6 +1263,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     if (formData.dispatchTimeline.shippingDays <= 0) newErrors.shippingDays = 'Enter the shipping days (at least 1).'
     if (!formData.weight || formData.weight.trim() === '') newErrors.weight = 'Shipping weight is required.'
     if (!formData.weightUnit) newErrors.weightUnit = 'Please select a weight unit.'
+    // When unpacked, a type must be chosen; "Other" additionally needs a remark.
+    if (formData.packagingType === 'UNPACKED') {
+      if (!formData.unpackedType) newErrors.unpackedType = 'Please select the unpacked type (stitched / unstitched / other).'
+      else if (formData.unpackedType === 'OTHER' && !(formData.unpackedNote || '').trim()) newErrors.unpackedNote = 'Please add a note describing the unpacked product.'
+    }
     if (!isEdit && !shippingConfirmed) newErrors.shippingConfirmed = 'Please confirm the shipping timeline before creating the product.'
 
     if (Object.keys(newErrors).length > 0) {
@@ -1708,6 +1721,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                           ...prev,
                           packagingType: value as 'PACKED' | 'UNPACKED' | '',
                           packingType: value === 'PACKED' ? prev.packingType : '',
+                          unpackedType: value === 'UNPACKED' ? prev.unpackedType : '',
+                          unpackedNote: value === 'UNPACKED' ? prev.unpackedNote : '',
                         }))}
                       />
                       <p className="text-xs text-slate-500 mt-1">Is this product shipped packed or unpacked?</p>
@@ -1730,6 +1745,45 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         onChange={(value) => setFormData(prev => ({ ...prev, packingType: value as 'BALE' | 'CARTON' | '' }))}
                       />
                       <p className="text-xs text-slate-500 mt-1">How is the packed product bundled?</p>
+                    </div>
+                    )}
+                    {formData.packagingType === 'UNPACKED' && (
+                    <div id="vf-unpackedType">
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        Unpacked Type <span className="text-red-500">*</span>
+                      </label>
+                      <div className={errors.unpackedType ? 'rounded-lg ring-2 ring-red-500/40' : ''}>
+                        <Dropdown
+                          label=""
+                          value={formData.unpackedType || ''}
+                          options={[
+                            { value: '', label: 'Select type…' },
+                            { value: 'STITCHED', label: 'Stitched' },
+                            { value: 'UNSTITCHED', label: 'Unstitched' },
+                            { value: 'OTHER', label: 'Other' },
+                          ]}
+                          placeholder="Select type…"
+                          buttonClassName="py-2.5 rounded-lg"
+                          onChange={(value) => { clearError('unpackedType'); setFormData(prev => ({ ...prev, unpackedType: value as 'STITCHED' | 'UNSTITCHED' | 'OTHER' | '' })) }}
+                        />
+                      </div>
+                      {errors.unpackedType
+                        ? <p className="text-xs text-red-600 mt-1">{errors.unpackedType}</p>
+                        : <p className="text-xs text-slate-500 mt-1">Is the unpacked product stitched, unstitched or other?</p>}
+                      <div className="mt-3" id="vf-unpackedNote">
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">
+                          Note / Remarks{formData.unpackedType === 'OTHER' ? ' *' : ''}
+                        </label>
+                        <textarea
+                          name="unpackedNote"
+                          value={formData.unpackedNote || ''}
+                          onChange={(e) => { clearError('unpackedNote'); handleInputChange(e) }}
+                          rows={2}
+                          className={`w-full px-3.5 py-2.5 border rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors ${errors.unpackedNote ? 'border-red-400 ring-2 ring-red-500/40' : 'border-slate-300'}`}
+                          placeholder="Add any remarks about the unpacked product…"
+                        />
+                        {errors.unpackedNote && <p className="text-xs text-red-600 mt-1">{errors.unpackedNote}</p>}
+                      </div>
                     </div>
                     )}
                     <div>
@@ -1964,9 +2018,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         value={formData.fabricSpecifications.gsm || ''}
                         className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 bg-slate-100 cursor-not-allowed"
                         placeholder="—"
-                        title="GSM = (Weight in g × 10000) ÷ (Length in cm × Width in cm)"
+                        title="GSM is auto-calculated from Weight, Length and Width"
                       />
-                      <p className="mt-1 text-xs text-slate-400">GSM = (Weight × 10000) ÷ (Length × Width)</p>
                     </div>
                   </div>
 

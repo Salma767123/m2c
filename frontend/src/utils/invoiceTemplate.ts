@@ -43,6 +43,9 @@ interface CustomerOrder {
   subtotal: number;
   shipping: number;
   tax: number;
+  /** Credit points redeemed at checkout and their money value — a tender reducing amount paid. */
+  pointsRedeemed?: number;
+  pointsRedeemedValue?: number;
   total: number;
   status: 'pending' | 'confirmed' | 'processing' | 'shipped_to_hub' | 'at_hub' | 'hub_quality_check' | 'hub_approved' | 'shipped_to_customer' | 'delivered' | 'cancelled';
   paymentStatus: 'pending' | 'paid' | 'failed';
@@ -271,6 +274,10 @@ export const generateInvoiceHTML = (order: CustomerOrder): string => {
           <div class="total-row">
             <strong>Tax: $${order.tax.toFixed(2)}</strong>
           </div>
+          ${(order.pointsRedeemedValue ?? 0) > 0 ? `
+          <div class="total-row">
+            <strong>Points redeemed (${order.pointsRedeemed} points): −$${(order.pointsRedeemedValue ?? 0).toFixed(2)}</strong>
+          </div>` : ''}
           <div class="total-final">
             <strong>Total Amount: $${order.total.toFixed(2)}</strong>
           </div>

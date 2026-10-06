@@ -28,7 +28,9 @@ const createCoupon = async (req, res) => {
             applicableProducts,
             isFirstOrder,
             targetCustomerIds,
+            region,
         } = req.body;
+        const validRegion = ['IN_ONLY', 'COM_ONLY', 'BOTH'].includes(region) ? region : 'BOTH';
         // Normalise the customer-targeting list (24-hex ObjectIds only, deduped).
         const targetIds = Array.isArray(targetCustomerIds)
             ? [...new Set(targetCustomerIds.filter((v) => typeof v === 'string' && /^[0-9a-fA-F]{24}$/.test(v)))]
@@ -87,11 +89,18 @@ const createCoupon = async (req, res) => {
                 applicableProducts: applicableProducts || [],
                 isFirstOrder: isFirstOrder || false,
                 targetCustomerIds: targetIds,
+                region: validRegion,
+                // Maker-checker: a new coupon is held PENDING and cannot be
+                // redeemed until an authorised person approves it.
+                ...require('../utils/approvals').submissionData({ id: req.user?.id, name: req.user?.name || req.user?.email }),
             }
         });
 
-        // Notify targeted customers that a coupon is waiting for them.
-        if (targetIds.length > 0) {
+        // Ping the authorised approver(s) that a coupon is waiting for approval.
+        require('../utils/approvals').notifyApprovers({ module: 'coupon', entityLabel: coupon.code, submittedByName: req.user?.name || req.user?.email });
+
+        // Notify targeted customers only once the coupon is actually live (approved).
+        if (coupon.approvalStatus === 'APPROVED' && targetIds.length > 0) {
             try {
                 const { createNotification } = require('./notificationController');
                 const pct = coupon.discountType === 'PERCENTAGE' ? `${coupon.discountValue}%` : `₹${coupon.discountValue}`;
@@ -212,6 +221,10 @@ const updateCoupon = async (req, res) => {
 
         if (updateData.startDate) updateData.startDate = new Date(updateData.startDate);
         if (updateData.expiryDate) updateData.expiryDate = new Date(updateData.expiryDate);
+        // Region must be a valid enum value; ignore anything else.
+        if (updateData.region !== undefined && !['IN_ONLY', 'COM_ONLY', 'BOTH'].includes(updateData.region)) {
+            delete updateData.region;
+        }
         // A newly-picked popup image arrives as base64 — upload it to Cloudinary and
         // store only the URL (existing URLs pass through unchanged).
         if (updateData.popupImage) updateData.popupImage = await resolveBase64InValue(updateData.popupImage, { folder: 'coupons' });
@@ -277,9 +290,9 @@ const applyCoupon = async (req, res) => {
         // All validation and discount math lives in utils/couponPricing so this
         // endpoint and orderController.createOrder can never drift apart. The
         // shopper previews here; the order recomputes with the same rules.
-        const { code, cartTotal, userId, currency } = req.body;
+        const { code, cartTotal, userId, currency, region } = req.body;
 
-        const result = await evaluateCoupon({ code, cartTotal, userId, currency });
+        const result = await evaluateCoupon({ code, cartTotal, userId, currency, region });
         if (!result.ok) {
             return res.status(400).json({ success: false, message: result.message });
         }
@@ -402,6 +415,7 @@ const getPromotionalCoupons = async (req, res) => {
         const coupons = await prisma.coupon.findMany({
             where: {
                 isActive: true,
+                approvalStatus: 'APPROVED', // hide coupons awaiting approval
                 startDate: { lte: now },
                 expiryDate: { gt: now }
             },
@@ -460,6 +474,7 @@ const getActiveCoupons = async (req, res) => {
         const coupons = await prisma.coupon.findMany({
             where: {
                 isActive: true,
+                approvalStatus: 'APPROVED', // hide coupons awaiting approval
                 startDate: { lte: now },
                 expiryDate: { gt: now },
             },
@@ -488,6 +503,7 @@ const getFirstOrderCoupon = async (req, res) => {
             where: {
                 isFirstOrder: true,
                 isActive: true,
+                approvalStatus: 'APPROVED', // hide coupons awaiting approval
                 startDate: { lte: now },
                 expiryDate: { gt: now },
             },

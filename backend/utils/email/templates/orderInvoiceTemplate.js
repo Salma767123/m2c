@@ -98,12 +98,15 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
     items = [],
     subtotal = 0,
     shippingCost = 0,
+    shippingTax = 0,
     tax = 0,
     cgstAmount = 0,
     sgstAmount = 0,
     igstAmount = 0,
     taxType = null,
     discount = 0,
+    pointsRedeemed = 0,
+    pointsRedeemedValue = 0,
     totalAmount = 0,
     paymentMethod,
     paymentStatus,
@@ -304,6 +307,12 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
       return [summaryRow(withPct(gstNumber ? 'Tax (GST)' : 'Tax', uniformGstRate(items)), `${sym}${fmt(tax)}`)];
     })(),
     summaryRow('Shipping', shippingCost > 0 ? `${sym}${fmt(shippingCost)}` : 'Free'),
+    // GST charged on shipping (weight rate + delivery-zone fee), when configured.
+    (Number(shippingTax) || 0) > 0 ? summaryRow('Shipping GST', `${sym}${fmt(shippingTax)}`) : '',
+    // Credit points redeemed — a tender reducing the amount paid (like wallet).
+    (Number(pointsRedeemedValue) || 0) > 0
+      ? summaryRow(`Points redeemed (${pointsRedeemed} points)`, `− ${sym}${fmt(pointsRedeemedValue)}`, { color: '#16a34a' })
+      : '',
   ].join('');
 
   return `<!DOCTYPE html>

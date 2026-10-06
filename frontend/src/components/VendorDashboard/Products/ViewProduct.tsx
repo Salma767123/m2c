@@ -268,6 +268,14 @@ export default function ViewProduct({ productId }: ViewProductProps) {
               {product.category && <InfoField label="Category" value={product.category} />}
               {product.uom && <InfoField label="Selling Unit (UOM)" value={UOM_LABELS[product.uom] || product.uom} />}
               {product.baseSku && <InfoField label="Base SKU" value={product.baseSku} />}
+              {(product as any).packagingType && (
+                <InfoField label="Packaging" value={(product as any).packagingType === 'PACKED'
+                  ? `Packed${(product as any).packingType === 'BALE' ? ' — Bale pack' : (product as any).packingType === 'CARTON' ? ' — Carton box' : ''}`
+                  : `Unpacked${(product as any).unpackedType === 'STITCHED' ? ' — Stitched' : (product as any).unpackedType === 'UNSTITCHED' ? ' — Unstitched' : (product as any).unpackedType === 'OTHER' ? ' — Other' : ''}`} />
+              )}
+              {(product as any).packagingType === 'UNPACKED' && (product as any).unpackedNote && (
+                <InfoField label="Packaging Note" value={(product as any).unpackedNote} />
+              )}
               {(product as any).singleUnitColor && (
                 <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
                   <p className="text-xs font-medium text-slate-500 mb-1">Base Color</p>

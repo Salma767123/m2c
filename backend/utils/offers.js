@@ -29,6 +29,8 @@ function scopeRank(scope) {
 /** Live right now: active flag on, and inside [startsAt, endsAt]. */
 function isOfferLive(offer, now = new Date()) {
   if (!offer || offer.isActive === false) return false;
+  // Maker-checker: an offer won't apply until approved by an authorised person.
+  if (offer.approvalStatus && offer.approvalStatus !== 'APPROVED') return false;
   if (offer.startsAt && now < new Date(offer.startsAt)) return false;
   if (offer.endsAt && now > new Date(offer.endsAt)) return false;
   return true;

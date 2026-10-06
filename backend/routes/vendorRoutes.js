@@ -7,6 +7,7 @@ const {
   getVendorById,
   updateVendorById,
   approveVendor,
+  reviewVendor,
   rejectVendor,
   confirmRejection,
   cancelRejection,
@@ -39,6 +40,7 @@ router.post('/admin/create', authenticateToken, requireRole('admin'), requirePer
 router.get('/all', authenticateToken, requireRole('admin'), requirePermission(['vendor_management:view', 'assign_qc_checker:view']), getAllVendors);
 router.get('/:vendorId', authenticateToken, requireRole('admin'), requirePermission('vendor_management:view'), getVendorById);
 router.put('/:vendorId', authenticateToken, requireRole('admin'), requirePermission('vendor_management:edit'), vendorUploadFields, handleUploadError, updateVendorById);
+router.put('/:vendorId/review', authenticateToken, requireRole('admin'), requirePermission(['vendor_management:review', 'vendor_management:approve']), reviewVendor);
 router.put('/:vendorId/approve', authenticateToken, requireRole('admin'), requirePermission('vendor_management:approve'), approveVendor);
 router.put('/:vendorId/confirm-approval', authenticateToken, requireRole('admin'), requirePermission('vendor_management:approve'), confirmApproval);
 router.put('/:vendorId/cancel-approval', authenticateToken, requireRole('admin'), requirePermission('vendor_management:approve'), cancelApproval);

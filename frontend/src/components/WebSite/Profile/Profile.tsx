@@ -10,7 +10,8 @@ import {
   Camera,
   Loader2,
   RotateCcw,
-  Wallet
+  Wallet,
+  Gift
 } from 'lucide-react';
 import Image from 'next/image';
 import { dispatchAuthChange } from '@/lib/authEvents';
@@ -20,6 +21,7 @@ import AddressBook from '@/components/WebSite/Profile/AddressBook';
 import OrderHistory from '@/components/WebSite/Profile/OrderHistory';
 import ReturnsSection from '@/components/WebSite/Profile/ReturnsSection';
 import WalletSection from '@/components/WebSite/Profile/WalletSection';
+import PointsSection from '@/components/WebSite/Profile/PointsSection';
 import SupportTickets from '@/components/WebSite/Profile/SupportTickets';
 import AccountDiscovery from '@/components/WebSite/Profile/AccountDiscovery';
 import Reveal from '@/components/WebSite/Shared/Reveal';
@@ -140,7 +142,7 @@ const Profile = () => {
    */
   useEffect(() => {
     const t = searchParams?.get('tab');
-    const allowed = ['profile', 'addresses', 'orders', 'wallet', 'support'];
+    const allowed = ['profile', 'addresses', 'orders', 'wallet', 'points', 'support'];
     if (getRegion() === 'IN') allowed.push('returns'); // returns tab is .in only
     if (t && allowed.includes(t)) {
       setActiveTab(t);
@@ -450,6 +452,7 @@ const Profile = () => {
     // Returns / refunds / replacements are a .in (INR) feature only — hidden on .com.
     ...(getRegion() === 'IN' ? [{ id: 'returns', label: 'Returns & Replacements', icon: RotateCcw }] : []),
     { id: 'wallet', label: 'My Wallet', icon: Wallet },
+    { id: 'points', label: 'Credit Points', icon: Gift },
     { id: 'support', label: 'Support', icon: LifeBuoy },
   ];
 
@@ -711,6 +714,7 @@ const Profile = () => {
             {activeTab === 'orders' && <OrderHistory />}
             {activeTab === 'returns' && <ReturnsSection />}
             {activeTab === 'wallet' && <WalletSection />}
+            {activeTab === 'points' && <PointsSection />}
             {activeTab === 'support' && <SupportTickets />}
           </Reveal>
         </div>

@@ -28,6 +28,7 @@ exports.getRoles = async (req, res) => {
                 name: role.name,
                 description: role.description || '',
                 permissions: rolePermissions,
+                level: role.level ?? 10,
                 userCount: role._count?.admins || 0,
                 isSystem: role.isSystem,
                 createdAt: role.createdAt,
@@ -68,7 +69,7 @@ const validatePermissions = (perms) => {
 // Create a new role
 exports.createRole = async (req, res) => {
     try {
-        const { name, description, permissions } = req.body;
+        const { name, description, permissions, level } = req.body;
 
         // Check if role name already exists
         const existing = await prisma.role.findUnique({ where: { name } });
@@ -90,6 +91,7 @@ exports.createRole = async (req, res) => {
                 name,
                 description,
                 permissions: Array.isArray(permissions) ? permissions : [],
+                level: Number.isFinite(Number(level)) ? Math.trunc(Number(level)) : 10,
                 isSystem: false,
             }
         });
@@ -105,7 +107,7 @@ exports.createRole = async (req, res) => {
 exports.updateRole = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, description, permissions } = req.body;
+        const { name, description, permissions, level } = req.body;
 
         const role = await prisma.role.findUnique({ where: { id } });
         if (!role) {
@@ -141,6 +143,7 @@ exports.updateRole = async (req, res) => {
                 name: name !== undefined ? name : role.name,
                 description: description !== undefined ? description : role.description,
                 permissions: Array.isArray(permissions) ? permissions : role.permissions,
+                level: level !== undefined && Number.isFinite(Number(level)) ? Math.trunc(Number(level)) : role.level,
             }
         });
 

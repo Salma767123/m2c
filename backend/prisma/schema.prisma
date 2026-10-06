@@ -59,6 +59,15 @@ model Admin {
   // Business Information
   companyName String? // Company/Business name
   gstNumber   String? // GST/Tax identification number
+  designation String? // Job title / designation (e.g. "Operations Manager")
+
+  // ── Org placement (Phase-1 advanced user management) ──────────────────────
+  // Primary department/team and the manager/TL this person reports to. Bare
+  // ObjectId scalars (resolved in code). Scoped roles live in RoleAssignment;
+  // `roleId` above is kept for back-compat and mirrors the primary assignment.
+  departmentId String? @db.ObjectId
+  teamId       String? @db.ObjectId
+  reportsToId  String? @db.ObjectId // manager/TL in the reporting chain
 
   // Onboarding Configuration (IMMUTABLE after completion)
   onboardingCompleted Boolean @default(false)
@@ -78,12 +87,274 @@ model Role {
   description String?
   permissions String[] @default([])
   isSystem    Boolean  @default(false)
+  // Org rank used for approval routing + escalation (NOT for permissions).
+  // Fully custom numeric values, e.g. Staff=10, Team Lead=20, Manager=30,
+  // Director=40. Higher = more senior. Defaults to Staff level.
+  level       Int      @default(10)
   admins      Admin[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("roles")
+}
+
+// ── Organisation structure (dynamic tree) ────────────────────────────────────
+// Company → Department(s) → Team(s) → people. Arbitrary depth via Department.parentId.
+// Cross-links (headId, leadId, reportsToId, memberships) are bare ObjectId scalars
+// resolved in code — matching this codebase's convention (e.g. Order.customerId) and
+// avoiding heavy Prisma back-relation wiring.
+model Department {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  code        String? // short slug e.g. "vendor_mgmt"
+  description String?
+  parentId    String? @db.ObjectId // sub-department support
+  headId      String? @db.ObjectId // the director/head Admin
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parentId])
+  @@map("departments")
+}
+
+model Team {
+  id           String  @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  departmentId String  @db.ObjectId
+  leadId       String? @db.ObjectId // team lead Admin
+  description  String?
+  isActive     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([departmentId])
+  @@map("teams")
+}
+
+// A scoped role grant: "this admin has this role, within this scope". One row per
+// (admin, department) in practice — one role per department (see plan). GLOBAL scope
+// (no department) is for org-wide roles like Super Admin / company Director.
+model RoleAssignment {
+  id           String  @id @default(auto()) @map("_id") @db.ObjectId
+  adminId      String  @db.ObjectId
+  roleId       String  @db.ObjectId
+  scopeType    String  @default("GLOBAL") // GLOBAL | DEPARTMENT | TEAM
+  departmentId String? @db.ObjectId
+  teamId       String? @db.ObjectId
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([adminId])
+  @@index([roleId])
+  @@index([departmentId])
+  @@map("role_assignments")
+}
+
+// ============================================
+// WORKFLOW ENGINE (generic multi-stage approvals)
+// ============================================
+// Fully data-driven. A definition is a reusable template of ordered stages.
+// Any subject (Vendor, Product, Order, Refund, …) runs through the SAME engine
+// via subjectType + subjectId — nothing about the subject is hardcoded.
+
+// A reusable workflow template, e.g. "Vendor Onboarding", "Product Approval".
+model WorkflowDefinition {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  code        String  @unique // stable key e.g. "vendor_onboarding"
+  description String?
+  subjectType String // VENDOR | PRODUCT | ORDER | REFUND | RETURN | GENERIC | ...
+  isActive    Boolean @default(true)
+  version     Int     @default(1)
+
+  // How a new instance is started: MANUAL (someone starts it) or EVENT (fired by code).
+  trigger     String  @default("MANUAL") // MANUAL | EVENT
+  triggerEvent String? // e.g. "vendor.submitted" when trigger = EVENT
+
+  createdById   String? @db.ObjectId
+  createdByName String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([subjectType])
+  @@index([isActive])
+  @@map("workflow_definitions")
+}
+
+// One ordered step of a definition.
+model WorkflowStage {
+  id           String @id @default(auto()) @map("_id") @db.ObjectId
+  definitionId String @db.ObjectId
+  order        Int // 1-based sequence within the definition
+  name         String
+  description  String?
+
+  // WHO acts at this stage. assigneeType decides which of the target fields matters.
+  //   ROLE       -> any admin holding assigneeRoleId (a pool)
+  //   DEPARTMENT -> any admin in assigneeDepartmentId (a pool)
+  //   TEAM       -> any admin in assigneeTeamId (a pool)
+  //   USER       -> a specific admin (assigneeAdminId)
+  //   INITIATOR  -> whoever started the instance
+  //   DEPT_HEAD  -> the head of the subject/initiator's department
+  //   TEAM_LEAD  -> the lead of the initiator's team
+  //   DYNAMIC    -> assignee chosen at runtime by a prior stage's ASSIGN action
+  assigneeType         String  @default("ROLE")
+  assigneeRoleId       String? @db.ObjectId
+  assigneeDepartmentId String? @db.ObjectId
+  assigneeTeamId       String? @db.ObjectId
+  assigneeAdminId      String? @db.ObjectId
+  // For DYNAMIC: which earlier stage's ASSIGN picks this stage's assignee.
+  assignedByStageOrder Int?
+
+  actions String[] // allowed actions: APPROVE, REJECT, ASSIGN, SUBMIT, REQUEST_CHANGES
+
+  // Routing. Values: "NEXT" | "COMPLETE" | "PREVIOUS" | "INITIATOR" | "REJECT_END" | "<order:N>".
+  onApprove String @default("NEXT") // where an approve/submit goes
+  onReject  String @default("REJECT_END") // where a reject goes (configurable)
+
+  requiresComment Boolean @default(false)
+  allowReassign   Boolean @default(true)
+  slaHours        Int? // optional SLA for escalation (Phase 4)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([definitionId, order])
+  @@map("workflow_stages")
+}
+
+// One live run of a definition against a specific subject.
+model WorkflowInstance {
+  id             String @id @default(auto()) @map("_id") @db.ObjectId
+  definitionId   String @db.ObjectId
+  definitionCode String // denormalized for quick lookup
+  name           String // snapshot of definition name at start
+
+  subjectType  String
+  subjectId    String  @db.ObjectId
+  subjectLabel String? // human label for inbox/timeline e.g. "Acme Traders"
+
+  status            String @default("ACTIVE") // ACTIVE | COMPLETED | REJECTED | CANCELLED
+  currentStageId    String? @db.ObjectId
+  currentStageOrder Int     @default(0)
+
+  initiatedById   String? @db.ObjectId
+  initiatedByName String?
+
+  // Runtime overrides: assignees chosen by ASSIGN actions, keyed by target stage order.
+  // e.g. { "4": "<adminId>" } means stage 4 is assigned to that admin.
+  dynamicAssignees Json?
+  data             Json? // arbitrary context payload
+
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([subjectType, subjectId])
+  @@index([status])
+  @@index([definitionId])
+  @@map("workflow_instances")
+}
+
+// A pending (or resolved) unit of work sitting in someone's inbox.
+model WorkflowTask {
+  id           String @id @default(auto()) @map("_id") @db.ObjectId
+  instanceId   String @db.ObjectId
+  definitionId String @db.ObjectId
+  stageId      String @db.ObjectId
+  stageName    String
+  stageOrder   Int
+
+  // Resolved target of this task (pool or specific person).
+  assigneeType         String
+  assigneeRoleId       String? @db.ObjectId
+  assigneeDepartmentId String? @db.ObjectId
+  assigneeTeamId       String? @db.ObjectId
+  assigneeAdminId      String? @db.ObjectId
+
+  actions String[] // allowed actions for this task
+
+  // Denormalized subject info so the inbox needs no joins.
+  subjectType  String
+  subjectId    String  @db.ObjectId
+  subjectLabel String?
+
+  status      String  @default("PENDING") // PENDING | DONE | SKIPPED | CANCELLED
+  actionTaken String? // APPROVE | REJECT | ASSIGN | SUBMIT | REQUEST_CHANGES
+  actedById   String? @db.ObjectId
+  actedByName String?
+  comment     String?
+  actedAt     DateTime?
+
+  dueAt     DateTime? // SLA deadline
+  // Escalation (Phase 4): when a task blows its SLA, the sweep escalates it to
+  // the assignee's manager/dept-head and remembers where it came from.
+  escalated               Boolean @default(false)
+  escalationLevel         Int     @default(0)
+  originalAssigneeAdminId String? @db.ObjectId
+  escalatedAt             DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([status, assigneeAdminId])
+  @@index([status, assigneeRoleId])
+  @@index([status, assigneeDepartmentId])
+  @@index([status, assigneeTeamId])
+  @@index([status, dueAt])
+  @@index([instanceId])
+  @@map("workflow_tasks")
+}
+
+// Immutable audit trail of everything that happened on an instance.
+model WorkflowHistory {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  instanceId String @db.ObjectId
+  stageId    String? @db.ObjectId
+  stageName  String?
+  stageOrder Int?
+
+  action    String // STARTED | APPROVE | REJECT | ASSIGN | SUBMIT | REQUEST_CHANGES | COMPLETED | CANCELLED | ESCALATED
+  actorId   String? @db.ObjectId
+  actorName String?
+  comment   String?
+
+  fromStageOrder Int?
+  toStageOrder   Int?
+  meta           Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([instanceId, createdAt])
+  @@map("workflow_history")
+}
+
+// Delegation (Phase 4): "cover my tasks while I'm away." Any task directly
+// assigned to fromAdminId is also actionable by toAdminId while the delegation
+// is active and within its date window.
+model WorkflowDelegation {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  fromAdminId String   @db.ObjectId
+  fromName    String?
+  toAdminId   String   @db.ObjectId
+  toName      String?
+  reason      String?
+  startsAt    DateTime @default(now())
+  endsAt      DateTime?
+  isActive    Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([toAdminId, isActive])
+  @@index([fromAdminId, isActive])
+  @@map("workflow_delegations")
 }
 
 model WorkingHour {
@@ -282,6 +553,11 @@ model Vendor {
   approvedAt           DateTime?
   rejectedAt           DateTime?
   suspendedAt          DateTime?
+  // Registration-form review (staff gate before QC assignment)
+  reviewedBy           String? // Admin ID who reviewed the registration form
+  reviewedByName       String?
+  reviewedAt           DateTime?
+  reviewNote           String? // staff's qualification note
 
   // Owner Profile
   ownerName        String
@@ -672,6 +948,7 @@ model VendorReference {
 enum VendorStatus {
   PENDING
   UNDER_REVIEW
+  REVIEWED // registration form reviewed by staff & qualified — ready for QC assignment
   APPROVAL_PENDING
   APPROVED
   REJECTED
@@ -888,6 +1165,8 @@ model Product {
   // `packingType` = 'BALE' | 'CARTON' (the pack style); it stays null for UNPACKED.
   packagingType String? // 'PACKED' | 'UNPACKED'
   packingType   String? // 'BALE' | 'CARTON' — only when packagingType = 'PACKED'
+  unpackedType  String? // 'STITCHED' | 'UNSTITCHED' | 'OTHER' — only when packagingType = 'UNPACKED'
+  unpackedNote  String? // Free-text remark for the unpacked selection (esp. 'OTHER')
 
   // Single Unit Pricing Configuration
   singleUnitSize     String?
@@ -1114,11 +1393,18 @@ model Order {
 
   // Pricing
   subtotal     Float
-  shippingCost Float   @default(0)
+  shippingCost Float   @default(0) // weight-based rate + delivery-zone flat fee (pre-tax)
   tax          Float   @default(0) // Total GST = cgst + sgst + igst
   discount     Float   @default(0)
   totalAmount  Float
   couponCode   String?
+
+  // ── Delivery zone + shipping tax (destination-based) ──────────────────────
+  deliveryZoneId   String? @db.ObjectId // matched zone (null for legacy orders)
+  deliveryZoneName String?
+  deliveryFlatFee  Float   @default(0) // the zone's flat fee portion of shippingCost
+  shippingTax      Float   @default(0) // GST charged on shippingCost (order currency)
+  shippingTaxINR   Float?  // INR twin of shippingTax
 
   // GST split (India / `.in` only). Determined by comparing the Admin/Company
   // registered State (supplier) with the customer's shipping State (place of
@@ -1154,6 +1440,19 @@ model Order {
   walletApplied    Float? @default(0)
   walletAppliedINR Float?
   amountPaid       Float?
+
+  // Credit Points redeemed at checkout (also a tender, like walletApplied).
+  // pointsRedeemed = number of points spent; pointsRedeemedValue = their money value
+  // in the order currency; pointsRedeemedValueINR = the INR twin. pointsEarned is set
+  // once (on DELIVERED by default) so earning is idempotent and reversible.
+  pointsRedeemed         Int?   @default(0)
+  pointsRedeemedValue    Float? @default(0)
+  pointsRedeemedValueINR Float? @default(0)
+  pointsEarned           Int?   @default(0)
+  pointsEarnedAt         DateTime?
+  // Set when an order's points movements (earn + redeem) have been reversed on
+  // cancel/return, so the reversal is applied at most once.
+  pointsReversedAt       DateTime?
 
   // Payment Information
   paymentStatus PaymentStatus @default(PENDING)
@@ -1448,6 +1747,12 @@ model Coupon {
 
   isActive Boolean @default(true)
 
+  // Region availability — which storefront the coupon is redeemable on. IN_ONLY =>
+  // .in (INR) only, COM_ONLY => .com (USD) only, BOTH => everywhere. Mirrors the
+  // product/offer region model. Monetary fields are stored in INR and converted to
+  // the order currency at redemption, so a BOTH/COM coupon works on .com too.
+  region PriceVisibility @default(BOTH)
+
   // "First Order" coupon — only applies to a customer's very first order, and once
   // enabled+active it's the only first-order coupon allowed (surfaced in the
   // storefront's promo strip). At most one active first-order coupon at a time.
@@ -1467,6 +1772,15 @@ model Coupon {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Maker-checker approval — a coupon is held (not usable) until approved.
+  approvalStatus  String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  submittedById   String?   @db.ObjectId
+  submittedByName String?
+  approvedById    String?   @db.ObjectId
+  approvedByName  String?
+  approvedAt      DateTime?
+  rejectionReason String?
 
   @@map("coupons")
 }
@@ -1545,6 +1859,15 @@ model Offer {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Maker-checker approval — an offer is held (not applied) until approved.
+  approvalStatus  String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  submittedById   String?   @db.ObjectId
+  submittedByName String?
+  approvedById    String?   @db.ObjectId
+  approvedByName  String?
+  approvedAt      DateTime?
+  rejectionReason String?
 
   @@map("offers")
 }
@@ -2067,6 +2390,103 @@ model WalletTransaction {
   @@map("wallet_transactions")
 }
 
+// ── Credit Points (loyalty rewards) ─────────────────────────────────────────
+// Mirrors the Wallet: a per-customer running points balance backed by an immutable
+// ledger. Points are earned per purchase (admin-configurable rate, credited on
+// DELIVERED by default) and redeemed at checkout as a money tender (redeemValue
+// per point, in INR). One row per customer.
+model CreditPointsAccount {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  customerId String   @unique @db.ObjectId
+  balance    Int      @default(0) // running points balance
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("credit_points_accounts")
+}
+
+// Immutable ledger of every points movement — source of truth + audit.
+// EARN rows double as FIFO "lots": `remaining` tracks how many of that lot's points
+// are still unspent/unexpired, so redemption and expiry consume oldest-first.
+model CreditPointsTransaction {
+  id           String @id @default(auto()) @map("_id") @db.ObjectId
+  accountId    String @db.ObjectId
+  customerId   String @db.ObjectId
+  type         String // EARN | REDEEM | EXPIRE | REVERSE | ADJUST
+  points       Int // always positive; `type` gives the direction
+  balanceAfter Int // points balance immediately after this entry
+  source       String // ORDER_EARN | ORDER_REDEMPTION | ORDER_REVERSAL | EXPIRY | ADMIN_ADJUSTMENT
+  description  String?
+
+  // Money context (INR): redeemValue × points at the time, for display/reconciliation.
+  valueInr Float?
+
+  // FIFO lot accounting — EARN rows only. `remaining` starts == points and is drawn
+  // down by REDEEM/EXPIRE/REVERSE; `expiresAt` is set when expiry is enabled.
+  remaining Int?
+  expiresAt DateTime?
+
+  // References (whichever apply)
+  orderId   String? @db.ObjectId
+  orderCode String?
+
+  // Audit — who caused it
+  createdById   String? @db.ObjectId
+  createdByName String?
+  createdByType String? // customer | admin | system
+
+  createdAt DateTime @default(now())
+
+  @@index([customerId])
+  @@index([accountId])
+  @@index([createdAt])
+  @@index([type, expiresAt])
+  @@map("credit_points_transactions")
+}
+
+// Singleton settings row controlling the Credit Points program (admin-editable).
+model CreditPointsSettings {
+  id      String  @id @default(auto()) @map("_id") @db.ObjectId
+  enabled Boolean @default(false)
+
+  // Earning: award `earnPointsPerUnit` points for every `earnUnitInr` of eligible
+  // order value (in INR). e.g. 1 point per ₹100 → earnPointsPerUnit=1, earnUnitInr=100.
+  earnPointsPerUnit Float @default(1)
+  earnUnitInr       Float @default(100)
+  // Only orders at/above this INR value earn points (0 = no minimum).
+  minOrderAmountToEarnInr Float @default(0)
+  // When points are credited: 'DELIVERED' (refund-safe, default) or 'PLACED'.
+  earnOn String @default("DELIVERED")
+
+  // Redemption: each point is worth this many INR when redeemed.
+  redeemValuePerPointInr Float @default(1)
+  // Customer must hold at least this many points to redeem (0 = none).
+  minPointsToRedeem Int @default(0)
+  // Points may cover at most this percent of an order's total (0-100).
+  maxRedeemPercent Float @default(20)
+
+  // Points expire this many days after being earned (0 = never).
+  expiryDays Int @default(0)
+
+  // Which storefront(s) the program applies to: BOTH | IN_ONLY | COM_ONLY.
+  region String @default("BOTH")
+
+  updatedBy String?  @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Maker-checker approval — settings changes are held (program not live) until approved.
+  approvalStatus  String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  submittedById   String?   @db.ObjectId
+  submittedByName String?
+  approvedById    String?   @db.ObjectId
+  approvedByName  String?
+  approvedAt      DateTime?
+  rejectionReason String?
+
+  @@map("credit_points_settings")
+}
+
 // A customer-initiated payout of wallet store-credit to their bank/UPI. Self-service
 // (no admin approval): the wallet is debited the moment the request is made, and the
 // linked WalletTransaction (source WITHDRAWAL) records that debit. Admin/finance then
@@ -2407,11 +2827,39 @@ model InvoiceSettings {
   // Cloudinary URL of the authorised digital signature printed in the invoice's
   // "Authorised Signature" block. Optional.
   signature               String?
+  // GST % charged on the SHIPPING amount (weight rate + delivery-zone fee).
+  // Dynamic — null/0 means no tax on shipping.
+  shippingGstPercentage   Float?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("invoice_settings")
+}
+
+// ============================================
+// DELIVERY ZONES (destination-based availability + flat delivery fee)
+// ============================================
+// A zone decides whether M2C delivers to a destination and the FLAT fee added on
+// top of the weight-based shipping rate. Hierarchy: Country → (all or specific)
+// States → (all or specific) Cities. More specific matches win. Both ISO and name
+// are stored for each selected state so backend matching needs no dataset.
+model DeliveryZone {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  countryIso  String   // "IN"
+  countryName String   // "India"
+  allStates   Boolean  @default(false) // true = every state in the country
+  states      Json     @default("[]")  // [{ iso, name }] when allStates = false
+  allCities   Boolean  @default(false) // true = every city in the selected states
+  cities      String[] @default([])    // city names when allCities = false
+  flatFee     Float    @default(0)     // INR, added per order to the weight rate
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([countryIso])
+  @@map("delivery_zones")
 }
 
 // ============================================
@@ -2455,6 +2903,15 @@ model Settlement {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Maker-checker approval — a settlement cannot be paid out until approved.
+  approvalStatus  String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  submittedById   String?   @db.ObjectId
+  submittedByName String?
+  approvedById    String?   @db.ObjectId
+  approvedByName  String?
+  approvedAt      DateTime?
+  rejectionReason String?
 
   @@map("settlements")
 }

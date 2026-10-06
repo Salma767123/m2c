@@ -209,6 +209,42 @@ app.get("/api/jobs/vendor-acceptance-sweep", async (req, res) => {
   }
 });
 
+app.get("/api/jobs/workflow-escalation", async (req, res) => {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    return res.status(503).json({ success: false, error: "CRON_SECRET is not configured" });
+  }
+  if (req.headers.authorization !== `Bearer ${cronSecret}`) {
+    return res.status(401).json({ success: false, error: "Unauthorized" });
+  }
+  try {
+    const { runWorkflowEscalation } = require("./jobs/workflowEscalation");
+    const result = await runWorkflowEscalation();
+    res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    console.error("Workflow escalation failed:", error);
+    res.status(500).json({ success: false, error: "Workflow escalation failed" });
+  }
+});
+
+app.get("/api/jobs/points-expiry", async (req, res) => {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    return res.status(503).json({ success: false, error: "CRON_SECRET is not configured" });
+  }
+  if (req.headers.authorization !== `Bearer ${cronSecret}`) {
+    return res.status(401).json({ success: false, error: "Unauthorized" });
+  }
+  try {
+    const { runPointsExpiry } = require("./jobs/pointsExpiry");
+    const result = await runPointsExpiry();
+    res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    console.error("Credit-points expiry sweep failed:", error);
+    res.status(500).json({ success: false, error: "Credit-points expiry sweep failed" });
+  }
+});
+
 // Import routes
 const authRoutes = require("./routes/auth/authRoutes");
 const vendorRoutes = require("./routes/vendorRoutes");
@@ -230,6 +266,7 @@ const contactEnquiryRoutes = require("./routes/contactEnquiryRoutes");
 const couponRoutes = require("./routes/couponRoutes");
 const offerRoutes = require("./routes/offerRoutes");
 const courierRoutes = require("./routes/courierRoutes");
+const deliveryZoneRoutes = require("./routes/deliveryZoneRoutes");
 const supportRoutes = require("./routes/supportRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
 const qcCheckerRoutes = require("./routes/qcCheckerRoutes");
@@ -263,6 +300,10 @@ app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/returns", require("./routes/returnRoutes"));
 app.use("/api/wallet", require("./routes/walletRoutes"));
+app.use("/api/credit-points", require("./routes/creditPointsRoutes"));
+app.use("/api/organization", require("./routes/organizationRoutes"));
+app.use("/api/workflows", require("./routes/workflowRoutes"));
+app.use("/api/approvals", require("./routes/approvalRoutes"));
 app.use("/api/payment-settings", paymentSettingsRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/admin/profile", adminProfileRoutes);
@@ -274,6 +315,7 @@ app.use("/api/contact-enquiries", contactEnquiryRoutes);
 app.use("/api/coupons", couponRoutes);
 app.use("/api/offers", offerRoutes);
 app.use("/api/couriers", courierRoutes);
+app.use("/api/delivery-zones", deliveryZoneRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/qc-checkers", qcCheckerRoutes);
 app.use("/api/invoice-settings", invoiceSettingsRoutes);
@@ -486,6 +528,10 @@ if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
       startPromoEndingSoonCheck();
       const { startVendorAcceptanceSweep } = require('./jobs/vendorAcceptanceSweep');
       startVendorAcceptanceSweep();
+      const { startWorkflowEscalation } = require('./jobs/workflowEscalation');
+      startWorkflowEscalation();
+      const { startPointsExpiry } = require('./jobs/pointsExpiry');
+      startPointsExpiry();
     } catch (error) {
       console.error('Failed to start cron jobs:', error.message);
     }

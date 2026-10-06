@@ -144,6 +144,9 @@ export interface ProductDetailData {
   /** Vendor-set packaging mode that drives the QC form (skips/auto-selects sections). */
   packagingType?: string | null
   packingType?: string | null
+  /** When unpacked: 'STITCHED' | 'UNSTITCHED' | 'OTHER' + a free-text remark. */
+  unpackedType?: string | null
+  unpackedNote?: string | null
   qcInspectionData?: Record<string, unknown> | null
   inspectionCycleNumber?: number
   previousInspectionData?: Array<{

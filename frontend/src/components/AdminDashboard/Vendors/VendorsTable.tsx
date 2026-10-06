@@ -32,6 +32,8 @@ const getStatusBadge = (status: string) => {
       return <Badge className="bg-amber-50 text-amber-700 border border-amber-200 font-bold">Pending</Badge>
     case 'UNDER_REVIEW':
       return <Badge className="bg-blue-50 text-blue-700 border border-blue-200 font-bold">Under Review</Badge>
+    case 'REVIEWED':
+      return <Badge className="bg-teal-50 text-teal-700 border border-teal-200 font-bold">Reviewed &amp; Qualified</Badge>
     case 'SUSPENDED':
       return <Badge className="bg-orange-50 text-orange-700 border border-orange-200 font-bold">Suspended</Badge>
     case 'REJECTED':
@@ -567,6 +569,7 @@ export default function VendorsTable() {
                   { value: '', label: 'All Status' },
                   { value: 'PENDING', label: 'Pending' },
                   { value: 'UNDER_REVIEW', label: 'Under Review' },
+                  { value: 'REVIEWED', label: 'Reviewed & Qualified' },
                   { value: 'APPROVED', label: 'Approved' },
                   { value: 'REJECTED', label: 'Rejected' },
                   { value: 'APPROVAL_PENDING', label: 'Approval Pending' },
@@ -631,19 +634,19 @@ export default function VendorsTable() {
           </div>
         ) : (
           <>
-            <div>
-              <Table className="table-fixed">
+            <div className="overflow-x-auto">
+              <Table className="table-fixed min-w-[1100px]">
                 <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50">
                   <TableRow className="!bg-brand-500/[0.06] hover:!bg-brand-500/[0.06]">
-                    <TableHead className="w-[13%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider whitespace-nowrap">Vendor ID</TableHead>
-                    <TableHead className="w-[15%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Vendor</TableHead>
-                    <TableHead className="w-[12%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Contact Person</TableHead>
-                    <TableHead className="w-[14%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Contact</TableHead>
+                    <TableHead className="w-[12%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider whitespace-nowrap">Vendor ID</TableHead>
+                    <TableHead className="w-[14%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Vendor</TableHead>
+                    <TableHead className="w-[11%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Contact Person</TableHead>
+                    <TableHead className="w-[12%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Contact</TableHead>
                     <TableHead className="w-[9%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center">Status</TableHead>
-                    <TableHead className="w-[11%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center">Inspection</TableHead>
-                    <TableHead className="w-[9%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center whitespace-nowrap">Avg. Accept</TableHead>
-                    <TableHead className="w-[8%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center whitespace-nowrap">Join Date</TableHead>
-                    <TableHead className="w-[9%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-right whitespace-nowrap">Actions</TableHead>
+                    <TableHead className="w-[10%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center">Inspection</TableHead>
+                    <TableHead className="w-[8%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center whitespace-nowrap">Avg. Accept</TableHead>
+                    <TableHead className="w-[10%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center whitespace-nowrap">Join Date</TableHead>
+                    <TableHead className="w-[14%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-right whitespace-nowrap">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -748,7 +751,7 @@ export default function VendorsTable() {
                             <Link href={`/admin/dashboard/vendors/view/${vendor.id}`}>
                               <button
                                 title="View Details"
-                                className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+                                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
                               >
                                 <Eye className="h-4 w-4" />
                               </button>
@@ -758,7 +761,7 @@ export default function VendorsTable() {
                             <Link href={`/admin/dashboard/vendors/edit/${vendor.id}`}>
                               <button
                                 title="Edit Vendor"
-                                className="p-2 rounded-lg text-blue-500 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+                                className="p-1.5 rounded-lg text-blue-500 hover:text-blue-700 hover:bg-blue-50 transition-colors"
                               >
                                 <Edit className="h-4 w-4" />
                               </button>
@@ -770,7 +773,7 @@ export default function VendorsTable() {
                                 title="Approve Vendor"
                                 onClick={() => handleApproveVendor(vendor)}
                                 disabled={actionLoading === vendor.id}
-                                className="p-2 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors disabled:opacity-50"
+                                className="p-1.5 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors disabled:opacity-50"
                               >
                                 {actionLoading === vendor.id
                                   ? <LoadingSpinner size="sm" />
@@ -780,7 +783,7 @@ export default function VendorsTable() {
                                 title="Reject Vendor"
                                 onClick={() => handleRejectVendor(vendor)}
                                 disabled={actionLoading === vendor.id}
-                                className="p-2 rounded-lg text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors disabled:opacity-50"
+                                className="p-1.5 rounded-lg text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors disabled:opacity-50"
                               >
                                 <XCircle className="h-4 w-4" />
                               </button>
@@ -791,7 +794,7 @@ export default function VendorsTable() {
                               title="Suspend Vendor"
                               onClick={() => handleSuspendVendor(vendor)}
                               disabled={actionLoading === vendor.id}
-                              className="p-2 rounded-lg text-orange-500 hover:text-orange-700 hover:bg-orange-50 transition-colors disabled:opacity-50"
+                              className="p-1.5 rounded-lg text-orange-500 hover:text-orange-700 hover:bg-orange-50 transition-colors disabled:opacity-50"
                             >
                               <XCircle className="h-4 w-4" />
                             </button>
@@ -802,7 +805,7 @@ export default function VendorsTable() {
                                 title="Confirm Approval"
                                 onClick={() => setConfirmApprovalModal({ isOpen: true, vendor })}
                                 disabled={actionLoading === vendor.id}
-                                className="p-2 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors disabled:opacity-50"
+                                className="p-1.5 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors disabled:opacity-50"
                               >
                                 <CheckCircle className="h-4 w-4" />
                               </button>
@@ -810,7 +813,7 @@ export default function VendorsTable() {
                                 title="Cancel Approval — Restore to Pending"
                                 onClick={() => setCancelApprovalModal({ isOpen: true, vendor })}
                                 disabled={actionLoading === vendor.id}
-                                className="p-2 rounded-lg text-orange-500 hover:text-orange-700 hover:bg-orange-50 transition-colors disabled:opacity-50"
+                                className="p-1.5 rounded-lg text-orange-500 hover:text-orange-700 hover:bg-orange-50 transition-colors disabled:opacity-50"
                               >
                                 <RotateCcw className="h-4 w-4" />
                               </button>
@@ -822,7 +825,7 @@ export default function VendorsTable() {
                                 title="Confirm Rejection"
                                 onClick={() => setConfirmRejectionModal({ isOpen: true, vendor })}
                                 disabled={actionLoading === vendor.id}
-                                className="p-2 rounded-lg text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors disabled:opacity-50"
+                                className="p-1.5 rounded-lg text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors disabled:opacity-50"
                               >
                                 <CheckCircle className="h-4 w-4" />
                               </button>
@@ -830,7 +833,7 @@ export default function VendorsTable() {
                                 title="Cancel Rejection — Restore to Pending"
                                 onClick={() => setCancelRejectionModal({ isOpen: true, vendor })}
                                 disabled={actionLoading === vendor.id}
-                                className="p-2 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors disabled:opacity-50"
+                                className="p-1.5 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors disabled:opacity-50"
                               >
                                 <RotateCcw className="h-4 w-4" />
                               </button>

@@ -33,7 +33,7 @@ const getOrdinalSuffix = (n) => {
  * @returns {Promise<{ok: boolean, message?: string, code?: string, discountAmount?: number,
  *                     freeShipping?: boolean, discountType?: string, discountValue?: number}>}
  */
-async function evaluateCoupon({ code, cartTotal, userId, currency: rawCurrency }) {
+async function evaluateCoupon({ code, cartTotal, userId, currency: rawCurrency, region }) {
     const currency = (rawCurrency || 'INR').toUpperCase() === 'USD' ? 'USD' : 'INR';
     const symbol = currency === 'USD' ? '$' : '₹';
 
@@ -48,6 +48,17 @@ async function evaluateCoupon({ code, cartTotal, userId, currency: rawCurrency }
     const coupon = await prisma.coupon.findUnique({ where: { code } });
     if (!coupon) return { ok: false, message: 'Invalid coupon code' };
     if (!coupon.isActive) return { ok: false, message: 'This coupon is no longer active' };
+    // Maker-checker: not redeemable until approved by an authorised person.
+    if (coupon.approvalStatus && coupon.approvalStatus !== 'APPROVED') {
+        return { ok: false, message: 'This coupon is not available' };
+    }
+
+    // Region availability: a coupon limited to one storefront can't be redeemed on
+    // the other. Gate on the request region (or the order currency, which maps 1:1).
+    const { isVisibleInRegion } = require('./regionVisibility');
+    if (!isVisibleInRegion(coupon.region, region || currency)) {
+        return { ok: false, message: 'This coupon is not available in your region' };
+    }
 
     // Customer targeting: a coupon created for specific customers is redeemable
     // only by them. An empty list (the default) means it's open to everyone.

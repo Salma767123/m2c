@@ -12,7 +12,8 @@ import {
   Shield,
   Loader2,
   ShoppingBag,
-  BadgePercent
+  BadgePercent,
+  AlertCircle
 } from "lucide-react"
 import { calculateLogistics, type LogisticsConfig } from "@/lib/logistics"
 import { formatPrice, getCurrency, getRegion, getRegionalPrice, getRegionalOriginalPrice, convertUSDtoINR, convertINRtoUSD } from '@/lib/currency'
@@ -30,6 +31,8 @@ import orderService, { CreateOrderParams } from "@/services/orderService"
 import { stashRecentOrder } from "@/lib/recentOrder"
 import paymentService from "@/services/paymentService"
 import { walletService } from "@/services/walletService"
+import creditPointsService, { CreditPointsSettings } from "@/services/creditPointsService"
+import { deliveryZoneService } from "@/services/deliveryZoneService"
 import { userProfileService } from "@/services/userProfileService"
 import { userAuthService } from "@/services/userAuthService"
 import { paymentSettingsService, PublicPaymentSettings } from "@/services/paymentSettingsService"
@@ -119,6 +122,13 @@ export default function Checkout() {
   const [walletBalanceInr, setWalletBalanceInr] = useState(0)
   const [useWallet, setUseWallet] = useState(false)
 
+  // Credit (loyalty) points — a tender applied AFTER wallet. Value is INR-based;
+  // shown/capped in the order currency, re-clamped authoritatively by the server.
+  const [pointsSettings, setPointsSettings] = useState<Partial<CreditPointsSettings>>({})
+  const [pointsBalance, setPointsBalance] = useState(0)
+  const [usePoints, setUsePoints] = useState(false)
+  const [pointsInput, setPointsInput] = useState(0)
+
   // Saved addresses state
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([])
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null)
@@ -166,10 +176,18 @@ export default function Checkout() {
   const [orderSummary, setOrderSummary] = useState({
     subtotal: 0,
     shipping: 0,
+    shippingTax: 0,
     tax: 0,
     discount: 0,
     total: 0
   })
+
+  // Destination delivery zone: availability + flat fee + shipping GST. Weight
+  // shipping (INR) is lifted out of calculateTotals so the quote effect can use it.
+  const [weightShipInr, setWeightShipInr] = useState(0)
+  const [delivery, setDelivery] = useState<{ checked: boolean; serviceable: boolean; zoneName?: string; feeOrderCcy: number; taxOrderCcy: number; gstPct: number }>(
+    { checked: false, serviceable: true, feeOrderCcy: 0, taxOrderCcy: 0, gstPct: 0 }
+  )
 
   // Admin/Company registered State = GST SUPPLIER state (place-of-supply split).
   // Fetched from public company info; falls back to a single "Tax (GST)" row
@@ -232,7 +250,29 @@ export default function Checkout() {
 
   useEffect(() => {
     calculateTotals()
-  }, [cartItems, formData.shippingMethod, discountAmount])
+  }, [cartItems, formData.shippingMethod, discountAmount, freeShippingApplied, delivery.feeOrderCcy, delivery.taxOrderCcy])
+
+  // Destination delivery-zone quote: serviceability + flat fee + shipping GST.
+  // Runs when the shipping address or the weight-based shipping changes. INR
+  // figures are converted to the order currency for the summary + payment.
+  useEffect(() => {
+    const country = formData.country, state = formData.state, city = formData.city
+    if (!country || !state || !city) { setDelivery({ checked: false, serviceable: true, feeOrderCcy: 0, taxOrderCcy: 0, gstPct: 0 }); return }
+    let cancelled = false
+    deliveryZoneService.quote({ country, state, city, weightShippingInr: weightShipInr, freeShipping: freeShippingApplied })
+      .then((q) => {
+        if (cancelled) return
+        if (!q.serviceable) { setDelivery({ checked: true, serviceable: false, feeOrderCcy: 0, taxOrderCcy: 0, gstPct: 0 }); return }
+        const toCcy = (inr: number) => getCurrency() === 'USD' ? convertINRtoUSD(inr) : inr
+        setDelivery({
+          checked: true, serviceable: true, zoneName: q.zone?.name,
+          feeOrderCcy: toCcy(q.flatFeeInr || 0),
+          taxOrderCcy: toCcy(q.shippingTaxInr || 0),
+          gstPct: q.shippingGstPct || 0,
+        })
+      })
+    return () => { cancelled = true }
+  }, [formData.country, formData.state, formData.city, weightShipInr, freeShippingApplied])
 
   // Load the customer's wallet balance so it can be offered at checkout.
   useEffect(() => {
@@ -241,13 +281,58 @@ export default function Checkout() {
       .catch(() => setWalletBalanceInr(0))
   }, [])
 
+  // Load the credit-points settings + balance for the redeem widget.
+  useEffect(() => {
+    creditPointsService.getPublicSettings()
+      .then((res) => {
+        setPointsSettings(res.data?.settings || {})
+        setPointsBalance(res.data?.balance || 0)
+      })
+      .catch(() => { setPointsSettings({}); setPointsBalance(0) })
+  }, [])
+
   // Wallet redemption (tender applied after the total). Balance is INR; show/cap it
   // in the order currency. walletApplied never exceeds the balance or the total.
   const money2 = (n: number) => Number((n || 0).toFixed(2))
   const walletBalanceOrderCcy = getCurrency() === 'USD' ? money2(convertINRtoUSD(walletBalanceInr)) : money2(walletBalanceInr)
   const walletApplied = useWallet ? money2(Math.min(walletBalanceOrderCcy, orderSummary.total)) : 0
-  const netPayable = Math.max(0, money2(orderSummary.total - walletApplied))
-  const walletCoversAll = walletApplied > 0 && netPayable <= 0.009
+  // Wallet alone covers the whole order → no gateway needed (points are irrelevant here).
+  const walletCoversAll = walletApplied > 0 && money2(orderSummary.total - walletApplied) <= 0.009
+
+  // Credit points redemption — applied AFTER wallet in the tender order. Mirrors the
+  // backend caps (pts ≤ balance; value ≤ max-redeem % of total AND ≤ amount left after
+  // wallet; below the min-to-redeem floor nothing applies). Server re-clamps, so this
+  // is UX only. Per-point value is INR; convert to the order currency for display.
+  const pointsRegionOk = (() => {
+    const region = pointsSettings.region || 'BOTH'
+    if (region === 'IN_ONLY') return getCurrency() === 'INR'
+    if (region === 'COM_ONLY') return getCurrency() === 'USD'
+    return true
+  })()
+  const pointValueOrderCcy = (() => {
+    const perInr = Number(pointsSettings.redeemValuePerPointInr) || 0
+    return getCurrency() === 'USD' ? convertINRtoUSD(perInr) : perInr
+  })()
+  const remainingAfterWallet = Math.max(0, money2(orderSummary.total - walletApplied))
+  const pointsMinToRedeem = Math.max(1, Number(pointsSettings.minPointsToRedeem) || 0)
+  const pointsHeadroomValue = Math.min(
+    money2(orderSummary.total * (Number(pointsSettings.maxRedeemPercent) || 0) / 100),
+    remainingAfterWallet,
+  )
+  const maxRedeemablePoints = pointValueOrderCcy > 0
+    ? Math.min(pointsBalance, Math.floor(pointsHeadroomValue / pointValueOrderCcy))
+    : 0
+  const pointsEligible = !!pointsSettings.enabled && pointsRegionOk && pointsBalance > 0
+    && orderSummary.total > 0 && maxRedeemablePoints >= pointsMinToRedeem
+  const pointsToApply = usePoints && pointsEligible
+    ? Math.min(Math.max(0, Math.floor(pointsInput) || 0), maxRedeemablePoints)
+    : 0
+  const pointsValueApplied = pointsToApply >= pointsMinToRedeem ? money2(pointsToApply * pointValueOrderCcy) : 0
+
+  // Net still payable via gateway after BOTH wallet and points.
+  const netPayable = Math.max(0, money2(orderSummary.total - walletApplied - pointsValueApplied))
+  // Any store-credit tender applied (drives "You pay now" vs "Total payable").
+  const anyTenderApplied = walletApplied > 0 || pointsValueApplied > 0
 
   const fetchCart = async () => {
     try {
@@ -644,9 +729,14 @@ export default function Checkout() {
         }
       }
     }
-    const shipping = freeShippingApplied
-      ? 0
-      : r2line(getCurrency() === 'USD' ? convertINRtoUSD(logisticsShippingInr) : logisticsShippingInr);
+    // Lift the weight-based shipping (INR) so the delivery-zone quote effect can use it.
+    const weightInr = freeShippingApplied ? 0 : logisticsShippingInr;
+    setWeightShipInr(weightInr);
+    const weightShipCcy = r2line(getCurrency() === 'USD' ? convertINRtoUSD(weightInr) : weightInr);
+    // Final shipping = weight rate + the destination zone's flat fee (converted).
+    const deliveryFeeCcy = freeShippingApplied ? 0 : (delivery.feeOrderCcy || 0);
+    const shippingTaxCcy = freeShippingApplied ? 0 : (delivery.taxOrderCcy || 0);
+    const shipping = r2line(weightShipCcy + deliveryFeeCcy);
     // Same per-line rounding and same base (the rounded line total) the server
     // uses, so the tax shown here equals the tax the server will store.
     // GST on the POST-coupon net: allocate the coupon across lines in proportion
@@ -669,18 +759,20 @@ export default function Checkout() {
     const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
     const roundedSubtotal = r2(subtotal)
     const roundedShipping = r2(shipping)
+    const roundedShippingTax = r2(shippingTaxCcy)
     const roundedTax = r2(tax)
     const roundedDiscount = r2(discountAmount)
 
-    // Calculate total with discount, ensure >= 0
+    // Calculate total with discount, ensure >= 0. Shipping GST is added on top.
     const total = Math.max(
       0,
-      r2(roundedSubtotal + roundedShipping + roundedTax - roundedDiscount)
+      r2(roundedSubtotal + roundedShipping + roundedShippingTax + roundedTax - roundedDiscount)
     )
 
     setOrderSummary({
       subtotal: roundedSubtotal,
       shipping: roundedShipping,
+      shippingTax: roundedShippingTax,
       tax: roundedTax,
       discount: roundedDiscount,
       total
@@ -870,6 +962,8 @@ export default function Checkout() {
         currency: getCurrency(),
         // Wallet store credit applied (order currency). Server clamps + debits it.
         walletApplied: walletApplied > 0 ? walletApplied : undefined,
+        // Credit points redeemed (whole points, applied after wallet). Server clamps + debits.
+        pointsRedeemed: pointsToApply > 0 ? pointsToApply : undefined,
       })
 
       if (response.success && response.data) {
@@ -1274,7 +1368,8 @@ export default function Checkout() {
                       (item.product?.availableStock !== undefined && item.quantity > item.product?.availableStock)
                     ) ||
                     itemsMissingTransport.length > 0 ||
-                    (currentStep === 1 && !canAdvanceShipping)
+                    (currentStep === 1 && !canAdvanceShipping) ||
+                    (delivery.checked && !delivery.serviceable)
                   }
                   className="btn-shine flex items-center gap-2 rounded-full bg-[#e01a1b] px-6 py-2.5 text-sm font-semibold text-white shadow-[0_6px_20px_rgba(224,26,27,0.3)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#c41617] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0 sm:px-8 sm:py-3 sm:text-base"
                 >
@@ -1476,6 +1571,20 @@ export default function Checkout() {
                     <span className="tabular-nums text-[#1a1a1a]">{formatPrice(orderSummary.shipping)}</span>
                   )}
                 </div>
+
+                {orderSummary.shippingTax > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[#6b625b]">Shipping GST{delivery.gstPct ? ` (${delivery.gstPct}%)` : ''}</span>
+                    <span className="tabular-nums text-[#1a1a1a]">{formatPrice(orderSummary.shippingTax)}</span>
+                  </div>
+                )}
+
+                {delivery.checked && !delivery.serviceable && (
+                  <div className="mt-1 flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2 text-[12.5px] text-red-700 ring-1 ring-red-100">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>Delivery is not available to this location. Please choose a different delivery address to continue.</span>
+                  </div>
+                )}
               </div>
 
               {totalSavings > 0 && (
@@ -1506,18 +1615,57 @@ export default function Checkout() {
                 </label>
               )}
 
+              {/* Credit (loyalty) points — a separate tender applied after wallet. */}
+              {pointsEligible && (
+                <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-3.5">
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input type="checkbox" checked={usePoints}
+                      onChange={(e) => { setUsePoints(e.target.checked); if (e.target.checked) setPointsInput(maxRedeemablePoints) }}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-amber-600" />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="text-[13.5px] font-semibold text-amber-900">Use Credit Points</span>
+                        <span className="text-[12.5px] font-medium text-amber-700">Balance {pointsBalance} pts</span>
+                      </span>
+                      <span className="mt-0.5 block text-[12px] text-amber-800/70">
+                        {usePoints && pointsValueApplied > 0
+                          ? `−${formatPrice(pointsValueApplied)} applied (${pointsToApply} points)`
+                          : `Redeem up to ${maxRedeemablePoints} points on this order.`}
+                      </span>
+                    </span>
+                  </label>
+                  {usePoints && (
+                    <div className="mt-3 flex items-center gap-2 pl-7">
+                      <input type="number" min={0} max={maxRedeemablePoints} step={1} value={pointsInput}
+                        onChange={(e) => setPointsInput(Math.min(maxRedeemablePoints, Math.max(0, Math.floor(Number(e.target.value) || 0))))}
+                        className="w-24 rounded-lg border border-amber-300 bg-white px-2.5 py-1.5 text-[13px] tabular-nums outline-none focus:border-amber-500" />
+                      <span className="text-[12px] text-amber-800/70">of {maxRedeemablePoints} pts</span>
+                      <button type="button" onClick={() => setPointsInput(maxRedeemablePoints)}
+                        className="ml-auto rounded-lg border border-amber-300 px-2.5 py-1.5 text-[12px] font-semibold text-amber-800 hover:bg-amber-100">
+                        Max
+                      </button>
+                    </div>
+                  )}
+                  {usePoints && pointsToApply > 0 && pointsToApply < pointsMinToRedeem && (
+                    <p className="mt-2 pl-7 text-[11.5px] text-amber-700">Redeem at least {pointsMinToRedeem} points to apply.</p>
+                  )}
+                </div>
+              )}
+
               {/* The one dark object on the page, and the only one that earns
                   it: the figure the whole checkout exists to arrive at. */}
               <div className="mt-5 rounded-2xl bg-linear-to-br from-[#2f1e1a] to-[#1f1312] px-5 py-4 text-white shadow-[0_14px_34px_-20px_rgba(70,40,25,0.85)]">
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-base font-semibold sm:text-lg">{useWallet && walletApplied > 0 ? 'You pay now' : 'Total payable'}</span>
+                  <span className="text-base font-semibold sm:text-lg">{anyTenderApplied ? 'You pay now' : 'Total payable'}</span>
                   <span className="font-playfair text-2xl font-semibold tabular-nums sm:text-[28px]">
-                    {formatPrice(useWallet ? netPayable : orderSummary.total)}
+                    {formatPrice(anyTenderApplied ? netPayable : orderSummary.total)}
                   </span>
                 </div>
-                {useWallet && walletApplied > 0 && (
+                {anyTenderApplied && (
                   <p className="mt-1 text-[12px] text-white/60">
-                    Order total {formatPrice(orderSummary.total)} · wallet −{formatPrice(walletApplied)}
+                    Order total {formatPrice(orderSummary.total)}
+                    {walletApplied > 0 && ` · wallet −${formatPrice(walletApplied)}`}
+                    {pointsValueApplied > 0 && ` · points −${formatPrice(pointsValueApplied)}`}
                   </p>
                 )}
                 {getRegion() === 'IN' && (
@@ -1532,9 +1680,9 @@ export default function Checkout() {
                   rupees reads as a wrong amount. Same rate the server
                   uses, so the figure matches the actual charge.
                 */}
-                {getCurrency() === 'USD' && (useWallet ? netPayable : orderSummary.total) > 0 && (
+                {getCurrency() === 'USD' && (anyTenderApplied ? netPayable : orderSummary.total) > 0 && (
                   <p className="mt-2 text-xs leading-relaxed text-white/55">
-                    Charged as {formatPrice(convertUSDtoINR(useWallet ? netPayable : orderSummary.total), 'INR')} — billed in INR at today&apos;s exchange rate.
+                    Charged as {formatPrice(convertUSDtoINR(anyTenderApplied ? netPayable : orderSummary.total), 'INR')} — billed in INR at today&apos;s exchange rate.
                   </p>
                 )}
               </div>

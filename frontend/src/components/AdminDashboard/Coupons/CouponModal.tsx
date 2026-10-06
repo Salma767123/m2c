@@ -239,6 +239,12 @@ const CouponModal = ({
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Maximum Discount</p>
                       <p className="mt-0.5 text-sm text-slate-900">{coupon.maxDiscountAmount ? `₹${coupon.maxDiscountAmount}` : 'No cap'}</p>
                     </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Region</p>
+                      <p className="mt-0.5 text-sm text-slate-900">
+                        {coupon.region === 'IN_ONLY' ? 'India only (.in)' : coupon.region === 'COM_ONLY' ? 'International only (.com)' : 'Both (.in & .com)'}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -384,12 +390,29 @@ const CouponModal = ({
                       <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">Description</label>
                         <textarea
-                          rows={4}
+                          rows={3}
                           value={formData.description || ''}
                           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                           className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent resize-none"
                           placeholder="Brief description of the coupon"
                         />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">
+                          Region Availability <span className="text-red-500">*</span>
+                        </label>
+                        <Dropdown
+                          value={formData.region || 'BOTH'}
+                          options={[
+                            { value: 'BOTH', label: 'Both (.in & .com)' },
+                            { value: 'IN_ONLY', label: 'India only (.in)' },
+                            { value: 'COM_ONLY', label: 'International only (.com)' },
+                          ]}
+                          onChange={(value) => setFormData({ ...formData, region: value as any })}
+                        />
+                        <p className="mt-1.5 text-xs text-slate-500">
+                          Amounts are entered in ₹ INR. On the .com (USD) store they're auto-converted at the live exchange rate.
+                        </p>
                       </div>
                     </div>
                   </div>

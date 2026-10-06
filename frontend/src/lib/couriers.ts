@@ -5,7 +5,7 @@
 // after courierService has fetched the list. STATIC_COURIERS is a fallback used for
 // the very first render and for legacy slug ids stored on old orders.
 
-export type CourierRegion = 'IN' | 'US';
+export type CourierRegion = 'IN' | 'US' | 'BOTH';
 export type TransportMode = 'AIR' | 'SHIP';
 
 export interface Courier {
@@ -97,7 +97,8 @@ function allCouriers(): Courier[] {
  */
 export function getCouriers(region?: string | null, mode?: TransportMode | null): Courier[] {
   const r = normalizeRegion(region);
-  return allCouriers().filter((c) => (!r || c.region === r) && (!mode || c.modes.includes(mode)));
+  // A courier tagged 'BOTH' serves the domestic (.in) and international (.com) stores alike.
+  return allCouriers().filter((c) => (!r || c.region === r || c.region === 'BOTH') && (!mode || c.modes.includes(mode)));
 }
 
 /** Look up a courier by id — runtime registry first, then the static fallback. */

@@ -121,6 +121,8 @@ export default function VendorView({ vendorId }: VendorViewProps) {
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState('overview')
   const [rejectionModal, setRejectionModal] = useState(false)
+  // 'direct' = legacy direct reject; 'review' = staff proposes rejection at the review gate
+  const [rejectMode, setRejectMode] = useState<'direct' | 'review'>('direct')
   const [suspensionModal, setSuspensionModal] = useState(false)
   const [approvalModal, setApprovalModal] = useState(false)
 
@@ -176,6 +178,29 @@ export default function VendorView({ vendorId }: VendorViewProps) {
   }
 
   const handleReject = () => {
+    setRejectMode('direct')
+    setRejectionModal(true)
+  }
+
+  // Staff review gate: mark the registration form reviewed & qualified.
+  const handleQualify = async () => {
+    if (!vendor) return
+    if (!confirm('Mark this registration as Reviewed & Qualified? It will then be ready for QC assignment.')) return
+    try {
+      setActionLoading('qualify')
+      await VendorService.reviewVendor(vendor.id, 'QUALIFIED')
+      setVendor({ ...vendor, status: 'REVIEWED', reviewedAt: new Date().toISOString() })
+      toast({ title: 'Reviewed & Qualified', description: 'Ready to assign a QC checker for factory inspection.' })
+    } catch (error: any) {
+      toast({ title: 'Error', description: error?.response?.data?.error || 'Failed to review vendor', variant: 'destructive' })
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  // Staff review gate: propose rejection (routes to an authorised person).
+  const handleProposeReject = () => {
+    setRejectMode('review')
     setRejectionModal(true)
   }
 
@@ -184,21 +209,20 @@ export default function VendorView({ vendorId }: VendorViewProps) {
 
     try {
       setActionLoading('reject')
-      await VendorService.rejectVendor(vendor.id, reason)
-
-      setVendor({ ...vendor, status: 'REJECTED', rejectedAt: new Date().toISOString(), rejectionReason: reason })
-      toast({
-        title: 'Success',
-        description: 'Vendor rejected successfully'
-      })
+      if (rejectMode === 'review') {
+        // Propose rejection → goes to an authorised person for the final decision.
+        await VendorService.reviewVendor(vendor.id, 'REJECT', { reason })
+        setVendor({ ...vendor, status: 'REJECTION_PENDING', rejectionReason: reason, rejectionRequestedAt: new Date().toISOString() })
+        toast({ title: 'Rejection proposed', description: 'Sent to an authorised person for the final decision.' })
+      } else {
+        await VendorService.rejectVendor(vendor.id, reason)
+        setVendor({ ...vendor, status: 'REJECTED', rejectedAt: new Date().toISOString(), rejectionReason: reason })
+        toast({ title: 'Success', description: 'Vendor rejected successfully' })
+      }
       setRejectionModal(false)
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to reject vendor'
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive'
-      })
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.error || (error instanceof Error ? error.message : 'Failed to reject vendor')
+      toast({ title: 'Error', description: errorMessage, variant: 'destructive' })
     } finally {
       setActionLoading(null)
     }
@@ -298,6 +322,8 @@ export default function VendorView({ vendorId }: VendorViewProps) {
         return <Badge className="bg-amber-50 text-amber-700 border border-amber-200 font-bold">Pending</Badge>
       case 'UNDER_REVIEW':
         return <Badge className="bg-blue-50 text-blue-700 border border-blue-200 font-bold">Under Review</Badge>
+      case 'REVIEWED':
+        return <Badge className="bg-teal-50 text-teal-700 border border-teal-200 font-bold">Reviewed &amp; Qualified</Badge>
       case 'SUSPENDED':
         return <Badge className="bg-red-50 text-red-700 border border-red-200 font-bold">Suspended</Badge>
       case 'REJECTED':
@@ -367,38 +393,53 @@ export default function VendorView({ vendorId }: VendorViewProps) {
                 </span>
               )}
 
-              {/* Action Buttons */}
-              {vendor.status === 'PENDING' && hasPermission('vendor_management:approve') && (
+              {/* Review gate — a staff member reviews the registration form first */}
+              {vendor.status === 'PENDING' && hasPermission('vendor_management:review') && (
                 <>
                   <Button
-                    onClick={handleApprove}
-                    disabled={actionLoading === 'approve'}
+                    onClick={handleQualify}
+                    disabled={actionLoading === 'qualify'}
                     className="bg-green-600 text-white hover:bg-green-700 rounded-xl"
                   >
-                    {actionLoading === 'approve' ? (
+                    {actionLoading === 'qualify' ? (
                       <LoadingSpinner size="sm" />
                     ) : (
                       <>
                         <CheckCircle className="h-4 w-4 mr-2" />
-                        Approve
+                        Reviewed &amp; Qualified
                       </>
                     )}
                   </Button>
                   <Button
-                    onClick={handleReject}
+                    onClick={handleProposeReject}
                     disabled={actionLoading === 'reject'}
                     variant="outline"
                     className="text-red-600 border-red-600 hover:bg-red-50"
                   >
-                    {actionLoading === 'reject' ? (
-                      <LoadingSpinner size="sm" />
-                    ) : (
-                      <>
-                        <XCircle className="h-4 w-4 mr-2" />
-                        Reject
-                      </>
-                    )}
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Reject
                   </Button>
+                </>
+              )}
+
+              {/* Reviewed & qualified — prompt to assign a QC checker next */}
+              {vendor.status === 'REVIEWED' && (
+                <>
+                  {(vendor as any).reviewedByName && (
+                    <span className="text-sm text-teal-700 bg-teal-50 px-3 py-1 rounded-full font-medium">
+                      Reviewed by <strong>{(vendor as any).reviewedByName}</strong>
+                      {(vendor as any).reviewedAt && (<> on {new Date((vendor as any).reviewedAt).toLocaleDateString('en-IN')}</>)}
+                    </span>
+                  )}
+                  {hasPermission('assign_qc_checker:create') && (
+                    <Button
+                      onClick={() => router.push('/admin/dashboard/vendors/assign-qc')}
+                      className="bg-brand-500 hover:bg-brand-600 text-white rounded-xl"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Assign QC Checker
+                    </Button>
+                  )}
                 </>
               )}
 
@@ -420,7 +461,7 @@ export default function VendorView({ vendorId }: VendorViewProps) {
                 </Button>
               )}
 
-              {vendor.status === 'APPROVAL_PENDING' && (
+              {vendor.status === 'APPROVAL_PENDING' && hasPermission('vendor_management:approve') && (
                 <>
                   <Button
                     onClick={async () => {
@@ -466,7 +507,7 @@ export default function VendorView({ vendorId }: VendorViewProps) {
                 </>
               )}
 
-              {vendor.status === 'REJECTION_PENDING' && (
+              {vendor.status === 'REJECTION_PENDING' && hasPermission('vendor_management:approve') && (
                 <>
                   <Button
                     onClick={async () => {

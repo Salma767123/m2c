@@ -185,6 +185,7 @@ const CouponManagement = () => {
     startDate: new Date().toISOString(),
     expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     isActive: true,
+    region: 'BOTH',
     freeShipping: false,
     freeShippingOrderNumbers: []
   };
@@ -215,6 +216,25 @@ const CouponManagement = () => {
 
   const getStatusBadge = (coupon: Coupon) => {
     const isExpired = new Date(coupon.expiryDate) < new Date();
+
+    // Maker-checker: show the approval state first — a pending coupon is not usable yet.
+    const approval = (coupon as any).approvalStatus;
+    if (approval === 'PENDING') {
+      return (
+        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+          <Clock className="w-3 h-3" />
+          Pending Approval
+        </span>
+      );
+    }
+    if (approval === 'REJECTED') {
+      return (
+        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
+          <XCircle className="w-3 h-3" />
+          Rejected
+        </span>
+      );
+    }
 
     if (isExpired) {
       return (

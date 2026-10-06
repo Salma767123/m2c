@@ -147,6 +147,14 @@ const updateSettlementStatus = async (req, res) => {
 
         // Only allow payment confirmation when order is delivered
         if (status === 'Paid') {
+            // Maker-checker: the settlement must be approved before any payout.
+            if (settlement.approvalStatus && settlement.approvalStatus !== 'APPROVED') {
+                return res.status(400).json({
+                    success: false,
+                    error: `Cannot pay out — settlement for "${settlement.vendorName}" is awaiting approval.`
+                });
+            }
+
             const orderStatus = settlement.order?.status?.toUpperCase();
             if (orderStatus !== 'DELIVERED' && orderStatus !== 'COMPLETED') {
                 return res.status(400).json({

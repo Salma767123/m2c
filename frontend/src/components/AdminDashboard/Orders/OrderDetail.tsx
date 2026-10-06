@@ -342,6 +342,13 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                                         <span className="text-green-600 font-medium">FREE</span>
                                     </div>
                                 )}
+                                {/* Credit points redeemed — a tender applied after wallet. */}
+                                {(order.pointsRedeemed ?? 0) > 0 ? (
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-slate-500">Points redeemed ({order.pointsRedeemed} points)</span>
+                                        <span className="text-green-600 font-medium">−{money(order.pointsRedeemedValue || 0)}</span>
+                                    </div>
+                                ) : null}
                                 <div className="flex justify-between pt-2 border-t border-slate-200">
                                     <span className="text-base font-semibold text-slate-900">Total</span>
                                     <span className="text-xl font-bold text-teal-600">{money(order.totalAmount ?? 0)}</span>

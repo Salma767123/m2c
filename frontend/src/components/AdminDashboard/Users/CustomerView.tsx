@@ -22,6 +22,7 @@ import {
   Star,
   LifeBuoy,
   Wallet,
+  Gift,
   ArrowDownLeft,
   ArrowUpRight,
   Ban,
@@ -30,6 +31,7 @@ import {
 } from 'lucide-react'
 import { formatPrice } from '@/lib/currency'
 import { walletService, WALLET_SOURCE_LABEL, type WalletSummary } from '@/services/walletService'
+import { creditPointsService, POINTS_SOURCE_LABEL, POINTS_TYPE_SIGN, type CreditPointsSummary } from '@/services/creditPointsService'
 import { hasPermission } from '@/lib/auth'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 
@@ -42,7 +44,8 @@ export default function CustomerView({ customerId }: CustomerViewProps) {
   const [customer, setCustomer] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [wallet, setWallet] = useState<WalletSummary | null>(null)
-  const [activeTab, setActiveTab] = useState<'orders' | 'wallet' | 'support'>('orders')
+  const [points, setPoints] = useState<CreditPointsSummary | null>(null)
+  const [activeTab, setActiveTab] = useState<'orders' | 'wallet' | 'points' | 'support'>('orders')
   // Suspend / reactivate flow.
   const [confirmSuspend, setConfirmSuspend] = useState(false)
   const [statusUpdating, setStatusUpdating] = useState(false)
@@ -91,6 +94,11 @@ export default function CustomerView({ customerId }: CustomerViewProps) {
     walletService.getWalletByCustomer(customerId)
       .then((res) => setWallet(res.data))
       .catch(() => setWallet(null))
+    // Credit points — a separate module too (needs points:view; a 403 just leaves
+    // the section empty for non-permitted admins).
+    creditPointsService.getAccountByCustomer(customerId)
+      .then((res) => setPoints(res.data))
+      .catch(() => setPoints(null))
   }, [customerId])
 
   if (loading) {
@@ -351,6 +359,7 @@ export default function CustomerView({ customerId }: CustomerViewProps) {
             {([
               { id: 'orders', label: 'Orders', icon: Package, count: customer.recentOrders?.length },
               { id: 'wallet', label: 'Wallet', icon: Wallet, count: undefined },
+              { id: 'points', label: 'Credit Points', icon: Gift, count: undefined },
               { id: 'support', label: 'Support Tickets', icon: LifeBuoy, count: customer.supportTickets?.length },
             ] as const).map((t) => {
               const active = activeTab === t.id
@@ -485,6 +494,60 @@ export default function CustomerView({ customerId }: CustomerViewProps) {
                 <div className="p-8 text-center text-slate-500">
                   <Wallet className="h-8 w-8 mx-auto mb-2 text-slate-300" />
                   <p>No wallet activity</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          )}
+
+          {/* Credit Points — this customer's loyalty balance + ledger */}
+          {activeTab === 'points' && (
+          <Card className="overflow-hidden rounded-2xl border-slate-200 shadow-sm">
+            <CardHeader className="border-b border-slate-200 bg-slate-50">
+              <CardTitle className="text-base flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2">
+                  <Gift className="h-4 w-4 text-slate-600" />
+                  Credit Points
+                </span>
+                <span className="text-sm font-bold text-amber-600">{(points?.balance || 0).toLocaleString('en-IN')} pts</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {points && points.transactions.length > 0 ? (
+                <div className="divide-y divide-slate-200">
+                  {points.transactions.slice(0, 10).map((t) => {
+                    const add = POINTS_TYPE_SIGN[t.type] === 1
+                    return (
+                      <div key={t.id} className="flex items-center gap-3 p-4">
+                        <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${add ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
+                          {add ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-slate-800">{POINTS_SOURCE_LABEL[t.source] || t.source}</p>
+                          <p className="truncate text-xs text-slate-500">{t.description || t.orderCode || ''}</p>
+                          <p className="text-[11px] text-slate-400">
+                            {new Date(t.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
+                            {t.createdByName ? ` · ${t.createdByName}` : ''}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className={`text-sm font-bold ${add ? 'text-amber-600' : 'text-slate-700'}`}>{add ? '+' : '−'}{t.points.toLocaleString('en-IN')} pts</p>
+                          <p className="text-[11px] text-slate-400">Bal {t.balanceAfter.toLocaleString('en-IN')}</p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  <div className="p-3 text-center">
+                    <button onClick={() => router.push('/admin/dashboard/customers/points')}
+                      className="text-xs font-semibold text-[#e01a1b] hover:underline">
+                      Manage in Credit Points →
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-8 text-center text-slate-500">
+                  <Gift className="h-8 w-8 mx-auto mb-2 text-slate-300" />
+                  <p>No credit-points activity</p>
                 </div>
               )}
             </CardContent>

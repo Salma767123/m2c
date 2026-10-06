@@ -120,6 +120,8 @@ function makeDefaultFormData(productName: string, vendorName: string) {
         // Drives which packaging/testing sections apply (see the autofill effect).
         packagingType: "" as string,
         packingType: "" as string,
+        unpackedType: "" as string,
+        unpackedNote: "" as string,
 
         // Step 2
         productVerifications: {} as Record<string, { ok: boolean | null; remarks: string }>,
@@ -401,6 +403,8 @@ export default function ProductInspectionForm({
                         productData: product,
                         packagingType: product?.packagingType || "",
                         packingType: product?.packingType || "",
+                        unpackedType: product?.unpackedType || "",
+                        unpackedNote: product?.unpackedNote || "",
                         packagingItems,
                         testGroups,
                         // Overwrite inspectorSignature with the current name from DB (picks up admin edits)

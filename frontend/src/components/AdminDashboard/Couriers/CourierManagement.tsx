@@ -8,9 +8,10 @@ import { uploadFileToCloudinary } from '@/lib/cloudinaryUpload'
 import Dropdown from '@/components/UI/Dropdown'
 import CourierBadge from '@/components/Shared/CourierBadge'
 
-const REGION_LABELS: Record<'IN' | 'US', string> = {
+const REGION_LABELS: Record<'IN' | 'US' | 'BOTH', string> = {
   IN: 'Domestic (India · .in)',
   US: 'International (.com)',
+  BOTH: 'Both (.in & .com)',
 }
 
 export default function CourierManagement() {
@@ -36,6 +37,7 @@ export default function CourierManagement() {
   const grouped = useMemo(() => ({
     IN: couriers.filter((c) => c.region === 'IN'),
     US: couriers.filter((c) => c.region === 'US'),
+    BOTH: couriers.filter((c) => c.region === 'BOTH'),
   }), [couriers])
 
   const handleDelete = async (c: Courier) => {
@@ -77,7 +79,8 @@ export default function CourierManagement() {
         </div>
       ) : (
         <div className="space-y-6">
-          {(['IN', 'US'] as const).map((region) => (
+          {(['IN', 'US', 'BOTH'] as const).map((region) => (
+            grouped[region].length === 0 && region === 'BOTH' ? null :
             <div key={region}>
               <h2 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">{REGION_LABELS[region]}</h2>
               <div className="bg-white rounded-xl border border-gray-100 shadow-sm divide-y divide-gray-100">
@@ -88,7 +91,7 @@ export default function CourierManagement() {
                     <CourierBadge courier={c} className="w-9 h-9 rounded-lg" codeClassName="text-[10px]" />
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-gray-900">{c.name}</p>
-                      <p className="text-xs text-gray-400">{c.modes.map((m) => (m === 'AIR' ? 'Air' : region === 'IN' ? 'Surface' : 'Sea')).join(' · ') || '—'}</p>
+                      <p className="text-xs text-gray-400">{c.modes.map((m) => (m === 'AIR' ? 'Air' : region === 'IN' ? 'Surface' : region === 'BOTH' ? 'Surface / Sea' : 'Sea')).join(' · ') || '—'}</p>
                     </div>
                     {!c.isActive && <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Inactive</span>}
                     <button onClick={() => { setEditing(c); setModalOpen(true) }} className="p-1.5 text-gray-500 hover:text-[#e01a1b] hover:bg-red-50 rounded" title="Edit"><Pencil className="w-4 h-4" /></button>
@@ -164,7 +167,7 @@ function CourierModal({ courier, onClose, onSaved }: { courier: Courier | null; 
     }
   }
 
-  const shipLabel = form.region === 'IN' ? 'Surface / Road' : 'Sea Freight'
+  const shipLabel = form.region === 'IN' ? 'Surface / Road' : form.region === 'BOTH' ? 'Surface / Sea Freight' : 'Sea Freight'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -236,10 +239,11 @@ function CourierModal({ courier, onClose, onSaved }: { courier: Courier | null; 
           <Dropdown
             label="Region *"
             value={form.region || 'IN'}
-            onChange={(v) => set('region', v as 'IN' | 'US')}
+            onChange={(v) => set('region', v as 'IN' | 'US' | 'BOTH')}
             options={[
               { value: 'IN', label: 'Domestic (India · .in)' },
               { value: 'US', label: 'International (.com)' },
+              { value: 'BOTH', label: 'Both (.in & .com)' },
             ]}
           />
 

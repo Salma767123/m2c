@@ -36,8 +36,11 @@ export interface Customer {
 
 export interface Staff {
     id: string;
+    title?: string;
     firstName: string;
+    middleName?: string;
     lastName: string;
+    designation?: string;
     email: string;
     phone: string;
     role: string;
