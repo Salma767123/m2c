@@ -80,7 +80,7 @@ const navigation: NavigationItem[] = [
     title: "Approvals",
     icon: ShieldCheck,
     href: "/admin/dashboard/approvals",
-    permission: ["coupons:approve", "settlement:approve", "points:approve"],
+    permission: ["coupons:approve", "settlement:approve", "points:approve", "staff_management:approve", "roles_permissions:approve"],
   },
 
   // ── 2. Vendors ────────────────────────────────────────────────────────────

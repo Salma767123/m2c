@@ -40,7 +40,7 @@ export default function ApprovalsInbox() {
   };
 
   const shown = filter === 'all' ? items : items.filter((i) => i.module === filter);
-  const moduleLabel: Record<ApprovalModule, string> = { coupon: 'Coupons', offer: 'Offers', settlement: 'Settlements', credit_points: 'Credit Points' };
+  const moduleLabel: Record<ApprovalModule, string> = { coupon: 'Coupons', offer: 'Offers', settlement: 'Settlements', credit_points: 'Credit Points', staff: 'Staff', role: 'Roles' };
 
   return (
     <div className="p-4 sm:p-6">

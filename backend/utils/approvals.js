@@ -43,6 +43,20 @@ const MODULE_CONFIG = {
     select: { id: true, enabled: true, earnPointsPerUnit: true, earnUnitInr: true, submittedByName: true, approvalStatus: true, rejectionReason: true, createdAt: true },
     toItem: (r) => ({ title: 'Credit Points program', subtitle: r.enabled ? `Enabled · ${r.earnPointsPerUnit}pt / ₹${r.earnUnitInr}` : 'Disabled' }),
   },
+  staff: {
+    model: 'admin',
+    permission: 'staff_management:approve',
+    label: 'Staff',
+    select: { id: true, name: true, email: true, submittedByName: true, approvalStatus: true, rejectionReason: true, createdAt: true },
+    toItem: (r) => ({ title: r.name || r.email, subtitle: r.email }),
+  },
+  role: {
+    model: 'role',
+    permission: 'roles_permissions:approve',
+    label: 'Role',
+    select: { id: true, name: true, description: true, submittedByName: true, approvalStatus: true, rejectionReason: true, createdAt: true },
+    toItem: (r) => ({ title: r.name, subtitle: r.description || '' }),
+  },
 };
 
 const MODULES = Object.keys(MODULE_CONFIG);

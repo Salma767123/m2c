@@ -216,6 +216,7 @@ const PERMISSION_MODULES = [
                 description: 'Staff (admin) accounts and role assignment',
                 actions: { view: true, create: true, edit: true, delete: true },
                 extra: [
+                    { key: 'approve', label: 'Approve / Reject', description: 'Approve or reject a newly created staff account before it can log in' },
                     { key: 'suspend', label: 'Activate / Suspend', description: 'Toggle a staff account status' },
                 ],
             },
@@ -224,7 +225,9 @@ const PERMISSION_MODULES = [
                 name: 'Roles & Permissions',
                 description: 'Roles and their permission sets',
                 actions: { view: true, create: true, edit: true, delete: true },
-                extra: [],
+                extra: [
+                    { key: 'approve', label: 'Approve / Reject', description: 'Approve or reject a newly created role before it can be assigned to staff' },
+                ],
             },
             {
                 key: 'organization',

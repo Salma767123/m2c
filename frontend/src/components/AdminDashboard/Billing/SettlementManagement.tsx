@@ -16,6 +16,7 @@ import DateRangeCalendar, { fmtDate } from "@/components/Shared/DateRangeCalenda
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { settlementService, Settlement } from "@/services/settlementService";
 import { hasPermission } from "@/lib/auth";
+import ApprovalActions from "@/components/AdminDashboard/Approvals/ApprovalActions";
 import VendorDeliveryReviewModal from "./VendorDeliveryReviewModal";
 
 const PAGE_SIZE = 10;
@@ -397,6 +398,7 @@ export default function SettlementManagement() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2 items-center">
+                        <ApprovalActions module="settlement" id={settlement.id} label={settlement.vendorName} approvalStatus={(settlement as any).approvalStatus} permission="settlement:approve" onDone={fetchSettlements} />
                         {(settlement.status === "Pending" || settlement.status === "Processing") && hasPermission('settlement:mark_paid') ? (
                           (() => {
                             const os = settlement.order?.status?.toUpperCase() || '';

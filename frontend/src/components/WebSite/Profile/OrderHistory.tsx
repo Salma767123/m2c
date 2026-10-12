@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Package, Eye, Download, Truck, CheckCircle, Clock, AlertCircle, ChevronDown, ChevronLeft, ChevronRight, ShoppingBag, SlidersHorizontal, Star, XCircle, RotateCcw, LifeBuoy } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Package, Eye, Download, Truck, CheckCircle, Clock, AlertCircle, ChevronDown, ChevronLeft, ChevronRight, ShoppingBag, SlidersHorizontal, Star, XCircle, RotateCcw, LifeBuoy, ShoppingCart, Loader2 } from 'lucide-react'
 import orderService, { Order as APIOrder } from '@/services/orderService'
 import reviewService from '@/services/reviewService'
 import ReviewModal from '@/components/WebSite/Order/ReviewModal'
@@ -185,6 +186,36 @@ export default function OrderHistory() {
   // New multi-step return flow + per-order return status.
   const [returnModalOrder, setReturnModalOrder] = useState<APIOrder | null>(null)
   const [returnsByOrder, setReturnsByOrder] = useState<Record<string, ReturnRequest>>({})
+  // Order whose "Buy Again" request is in flight (null = none).
+  const [buyingAgainId, setBuyingAgainId] = useState<string | null>(null)
+  const router = useRouter()
+
+  // "Buy Again": re-add this order's still-available items to the cart, then go
+  // to the cart. Mirrors the My Orders page.
+  const handleBuyAgain = async (order: APIOrder) => {
+    if (buyingAgainId) return
+    try {
+      setBuyingAgainId(order.id)
+      const res = await orderService.reorder(order.id)
+      const { addedCount = 0, skippedCount = 0, skipped = [], itemCount = 0 } = (res.data || {}) as any
+      if (addedCount > 0) {
+        const skipNote = skippedCount > 0
+          ? ` ${skippedCount} item${skippedCount > 1 ? 's' : ''} couldn't be added (${skipped.map((s: any) => s.reason).filter((v: string, i: number, a: string[]) => a.indexOf(v) === i).join(', ')}).`
+          : ''
+        showSuccessToast('Added to Cart', `${res.message}.${skipNote}`)
+        try { window.dispatchEvent(new CustomEvent('cart-changed', { detail: { count: itemCount } })) } catch {}
+        router.push('/cart')
+      } else {
+        showErrorToast('Nothing added', skippedCount > 0
+          ? `These items are currently unavailable (${skipped.map((s: any) => s.reason).filter((v: string, i: number, a: string[]) => a.indexOf(v) === i).join(', ')}).`
+          : 'No items from this order could be added to your cart.')
+      }
+    } catch (e: any) {
+      showErrorToast('Failed', e?.message || 'Could not add items to your cart. Please try again.')
+    } finally {
+      setBuyingAgainId(null)
+    }
+  }
 
   const fetchMyReturns = async () => {
     try {
@@ -630,15 +661,15 @@ export default function OrderHistory() {
                       <Download className="h-4 w-4" />
                       Invoice
                     </button>
-                    {CANCELLABLE_STATUSES.has(order.status) && (
-                      <button
-                        onClick={() => openActionModal(order, 'cancel')}
-                        className={`${QUIET_BTN} flex-1 border-red-200 text-[#e01a1b] hover:bg-red-50 hover:text-[#c41617] sm:flex-none`}
-                      >
-                        <XCircle className="h-4 w-4" />
-                        Cancel
-                      </button>
-                    )}
+                    {/* Buy Again — re-add this order's items to the cart (replaces Cancel). */}
+                    <button
+                      onClick={() => handleBuyAgain(order)}
+                      disabled={buyingAgainId === order.id}
+                      className={`${QUIET_BTN} flex-1 border-[#e01a1b] text-[#e01a1b] hover:bg-[#e01a1b] hover:text-white disabled:opacity-60 disabled:cursor-not-allowed sm:flex-none`}
+                    >
+                      {buyingAgainId === order.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingCart className="h-4 w-4" />}
+                      {buyingAgainId === order.id ? 'Adding…' : 'Buy Again'}
+                    </button>
                     {returnsByOrder[order.orderId] ? (
                       (() => {
                         const rr = returnsByOrder[order.orderId]

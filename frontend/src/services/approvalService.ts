@@ -1,6 +1,6 @@
 import axios from '@/lib/axios';
 
-export type ApprovalModule = 'coupon' | 'offer' | 'settlement' | 'credit_points';
+export type ApprovalModule = 'coupon' | 'offer' | 'settlement' | 'credit_points' | 'staff' | 'role';
 
 export interface ApprovalItem {
   module: ApprovalModule;
@@ -39,4 +39,6 @@ export const MODULE_STYLE: Record<ApprovalModule, string> = {
   offer: 'bg-pink-50 text-pink-700',
   settlement: 'bg-emerald-50 text-emerald-700',
   credit_points: 'bg-amber-50 text-amber-700',
+  staff: 'bg-blue-50 text-blue-700',
+  role: 'bg-indigo-50 text-indigo-700',
 };

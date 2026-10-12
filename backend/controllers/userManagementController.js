@@ -330,6 +330,8 @@ exports.getStaff = async (req, res) => {
                 role: true,
                 isActive: true,
                 isVerified: true,
+                approvalStatus: true,
+                rejectionReason: true,
                 createdAt: true,
                 lastLogin: true,
                 image: true,
@@ -364,6 +366,8 @@ exports.getStaff = async (req, res) => {
                 roleId: s.role ? s.role.id : null,
                 permissions: s.role ? s.role.permissions : [],
                 status: currentStatus,
+                approvalStatus: s.approvalStatus || 'APPROVED',
+                rejectionReason: s.rejectionReason || null,
                 joinDate: s.createdAt,
                 lastLogin: s.lastLogin || s.createdAt,
                 totalOrders: 0,
@@ -407,6 +411,8 @@ exports.getStaffById = async (req, res) => {
                 phoneNumber: true,
                 isActive: true,
                 isVerified: true,
+                approvalStatus: true,
+                rejectionReason: true,
                 createdAt: true,
                 lastLogin: true,
                 image: true,
@@ -445,6 +451,8 @@ exports.getStaffById = async (req, res) => {
                 roleId: s.role ? s.role.id : null,
                 permissions: s.role ? s.role.permissions : [],
                 status: currentStatus,
+                approvalStatus: s.approvalStatus || 'APPROVED',
+                rejectionReason: s.rejectionReason || null,
                 joinDate: s.createdAt,
                 lastLogin: s.lastLogin || s.createdAt,
                 totalOrders: 0,
@@ -502,6 +510,13 @@ exports.createStaff = async (req, res) => {
                 error: 'Selected role does not exist'
             });
         }
+        // Maker-checker: a role awaiting approval cannot be assigned yet.
+        if (role.approvalStatus && role.approvalStatus !== 'APPROVED') {
+            return res.status(400).json({
+                success: false,
+                error: `The role "${role.name}" is awaiting approval and cannot be assigned yet.`
+            });
+        }
 
         const existingAdmin = await prisma.admin.findUnique({ where: { email } });
         if (existingAdmin) return res.status(400).json({ success: false, error: 'Email already exists' });
@@ -546,9 +561,15 @@ exports.createStaff = async (req, res) => {
                 verificationToken,
                 onboardingCompleted: true,
                 googleId: `STAFF_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-                provider: 'local'
+                provider: 'local',
+                // Maker-checker: a new staff account is held PENDING and cannot log
+                // in until an authorised person approves it.
+                ...require('../utils/approvals').submissionData({ id: req.user?.id, name: req.user?.name || req.user?.email }),
             }
         });
+
+        // Ping the authorised approver(s) that a staff account needs approval.
+        require('../utils/approvals').notifyApprovers({ module: 'staff', entityLabel: displayName || email, submittedByName: req.user?.name || req.user?.email });
 
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
         const loginLink = `${frontendUrl}/admin/login`;

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { userManagementService, Staff } from '@/services/userManagementService';
 import { roleService, Role } from '@/services/roleService';
 import { hasPermission } from '@/lib/auth';
+import ApprovalActions from '@/components/AdminDashboard/Approvals/ApprovalActions';
 import { Button } from '@/components/UI/Button';
 import { Badge } from '@/components/UI/Badge';
 import {
@@ -480,6 +481,7 @@ export default function UserManagement() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
+                        <ApprovalActions module="staff" id={user.id} label={`${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email} approvalStatus={(user as any).approvalStatus} permission="staff_management:approve" onDone={fetchStaff} />
                         {hasPermission('staff_management:view') && (
                           <button
                             title="View User Details"

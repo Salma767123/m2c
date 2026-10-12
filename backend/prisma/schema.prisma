@@ -75,6 +75,16 @@ model Admin {
   // Working Hours Configuration
   workingHours WorkingHour[]
 
+  // Maker-checker approval — a newly created staff account is held (cannot log in)
+  // until an authorised person approves it.
+  approvalStatus  String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  submittedById   String?   @db.ObjectId
+  submittedByName String?
+  approvedById    String?   @db.ObjectId
+  approvedByName  String?
+  approvedAt      DateTime?
+  rejectionReason String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -92,6 +102,16 @@ model Role {
   // Director=40. Higher = more senior. Defaults to Staff level.
   level       Int      @default(10)
   admins      Admin[]
+
+  // Maker-checker approval — a newly created role is held (cannot be assigned to
+  // staff) until an authorised person approves it.
+  approvalStatus  String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  submittedById   String?   @db.ObjectId
+  submittedByName String?
+  approvedById    String?   @db.ObjectId
+  approvedByName  String?
+  approvedAt      DateTime?
+  rejectionReason String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
