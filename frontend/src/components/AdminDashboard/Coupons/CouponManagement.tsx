@@ -34,6 +34,7 @@ import CouponModal from './CouponModal';
 import FreeShippingModal from './FreeShippingModal';
 import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal';
 import { couponService, Coupon } from '@/services/couponService';
+import { approvalService } from '@/services/approvalService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { hasPermission } from '@/lib/auth';
 
@@ -324,6 +325,31 @@ const CouponManagement = () => {
     setShowModal(true);
   };
 
+  // Maker-checker: approve / reject a pending coupon inline.
+  const handleApprove = async (coupon: Coupon) => {
+    if (!window.confirm(`Approve coupon "${coupon.code}"? It will become live.`)) return;
+    try {
+      await approvalService.approve('coupon', coupon.id);
+      showSuccessToast('Approved', `${coupon.code} is now live.`);
+      fetchCoupons();
+    } catch (e: any) {
+      showErrorToast('Failed', e?.response?.data?.message || 'Could not approve.');
+    }
+  };
+
+  const handleReject = async (coupon: Coupon) => {
+    const reason = window.prompt(`Reject coupon "${coupon.code}"? Enter a reason:`);
+    if (reason === null) return;
+    if (!reason.trim()) { showErrorToast('Required', 'A rejection reason is required.'); return; }
+    try {
+      await approvalService.reject('coupon', coupon.id, reason.trim());
+      showSuccessToast('Rejected', `${coupon.code} was rejected.`);
+      fetchCoupons();
+    } catch (e: any) {
+      showErrorToast('Failed', e?.response?.data?.message || 'Could not reject.');
+    }
+  };
+
   const handleDeleteClick = (coupon: Coupon) => {
     setDeleteTarget({ id: coupon.id, code: coupon.code });
   };
@@ -597,6 +623,25 @@ const CouponManagement = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
+                        {/* Maker-checker: approve / reject a pending coupon */}
+                        {(coupon as any).approvalStatus === 'PENDING' && hasPermission('coupons:approve') && (
+                          <>
+                            <button
+                              onClick={() => handleApprove(coupon)}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-green-700 bg-green-50 hover:bg-green-100 rounded transition-colors"
+                              title="Approve"
+                            >
+                              <CheckCircle className="w-3.5 h-3.5" /> Approve
+                            </button>
+                            <button
+                              onClick={() => handleReject(coupon)}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 rounded transition-colors"
+                              title="Reject"
+                            >
+                              <XCircle className="w-3.5 h-3.5" /> Reject
+                            </button>
+                          </>
+                        )}
                         {hasPermission('coupons:view') && (
                           <button
                             onClick={() => handleView(coupon)}

@@ -31,6 +31,8 @@ exports.getRoles = async (req, res) => {
                 level: role.level ?? 10,
                 userCount: role._count?.admins || 0,
                 isSystem: role.isSystem,
+                approvalStatus: role.approvalStatus || 'APPROVED',
+                rejectionReason: role.rejectionReason || null,
                 createdAt: role.createdAt,
                 updatedAt: role.updatedAt,
             };
@@ -93,8 +95,14 @@ exports.createRole = async (req, res) => {
                 permissions: Array.isArray(permissions) ? permissions : [],
                 level: Number.isFinite(Number(level)) ? Math.trunc(Number(level)) : 10,
                 isSystem: false,
+                // Maker-checker: a new role is held PENDING and cannot be assigned
+                // to staff until an authorised person approves it.
+                ...require('../utils/approvals').submissionData({ id: req.user?.id, name: req.user?.name || req.user?.email }),
             }
         });
+
+        // Ping the authorised approver(s) that a role needs approval.
+        require('../utils/approvals').notifyApprovers({ module: 'role', entityLabel: role.name, submittedByName: req.user?.name || req.user?.email });
 
         res.status(201).json({ success: true, data: role });
     } catch (error) {

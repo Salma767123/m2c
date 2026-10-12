@@ -9,6 +9,7 @@ import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import type { OfferType, OfferScope, OfferRegion } from '@/lib/offers'
 import Dropdown from '@/components/UI/Dropdown'
 import Pagination from '@/components/UI/Pagination'
+import ApprovalActions from '@/components/AdminDashboard/Approvals/ApprovalActions'
 
 /**
  * Multi-select category dropdown used by the product pickers — a button that opens
@@ -510,6 +511,7 @@ export default function OfferManagement() {
                             ? <Loader2 className="w-4 h-4 animate-spin" />
                             : o.isActive ? <PauseCircle className="w-4 h-4" /> : <PlayCircle className="w-4 h-4" />}
                         </button>
+                        <ApprovalActions module="offer" id={o.id} label={o.title} approvalStatus={(o as any).approvalStatus} permission="coupons:approve" onDone={load} />
                         <button onClick={() => openEdit(o)} className="p-1.5 text-gray-500 hover:text-[#e01a1b] hover:bg-red-50 rounded" title="Edit">
                           <Pencil className="w-4 h-4" />
                         </button>

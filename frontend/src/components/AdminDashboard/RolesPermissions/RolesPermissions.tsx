@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import { hasPermission } from '@/lib/auth'
+import ApprovalActions from '@/components/AdminDashboard/Approvals/ApprovalActions'
 
 const PAGE_SIZE = 10
 
@@ -266,6 +267,18 @@ export default function RolesPermissions() {
                       </div>
                     </div>
 
+                    {(role as any).approvalStatus === 'PENDING' && (
+                      <div className="flex gap-2 mb-2">
+                        <ApprovalActions
+                          module="role"
+                          id={role.id}
+                          label={role.name}
+                          approvalStatus={(role as any).approvalStatus}
+                          permission="roles_permissions:approve"
+                          onDone={() => roleService.getRoles().then(r => { if (r.success) setRoles(r.data) })}
+                        />
+                      </div>
+                    )}
                     <div className="flex space-x-2">
                       {role.isSystem ? (
                         // System roles cannot be edited or deleted (backend rejects with 400).

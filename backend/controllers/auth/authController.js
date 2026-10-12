@@ -2324,6 +2324,17 @@ const superAdminLogin = async (req, res) => {
       });
     }
 
+    // Maker-checker: a newly created staff account cannot log in until approved.
+    if (admin.approvalStatus && admin.approvalStatus !== "APPROVED") {
+      console.log("❌ Admin account is awaiting approval / was rejected");
+      return res.status(403).json({
+        success: false,
+        error: admin.approvalStatus === "REJECTED"
+          ? "Your staff account was not approved. Please contact your administrator."
+          : "Your staff account is awaiting approval. You'll be able to sign in once it's approved.",
+      });
+    }
+
     // For Google OAuth admins without password
     if (admin.provider === "google" && !admin.password) {
       console.log("❌ Google OAuth admin trying to login with password");
